@@ -1546,12 +1546,12 @@ if "scan_analysis_done" not in st.session_state:
 # Tabs definition
 # -----------------------------
 tabs = st.tabs([
-    "لوحة المؤشرات",
-    "عرض الشركات",
-    "بيانات المراجعة من سمارت ريبورت"
+    "📊 بيانات المراجعة (سمارت ريبورت)",
+    "📈 لوحة المؤشرات",
+    "🏢 عرض الشركات"
 ])
 
-tab0, tab1, tab2 = tabs
+tab2, tab0, tab1 = tabs
 
 
 
@@ -1564,10 +1564,8 @@ with tab0:
     companies_data, companies_error = safe_get_json(f"{API_BASE_URL}/companies/")
     reports_data, reports_error = safe_get_json(f"{API_BASE_URL}/quarterly-reports/")
 
-    if companies_error:
-        st.error(f"تعذر جلب الشركات: {companies_error}")
-    if reports_error:
-        st.error(f"تعذر جلب التقارير: {reports_error}")
+    if companies_error or reports_error:
+        st.info("💡 هذه اللوحة مخصصة للتقارير الربع سنوية. لعرض مراجعات سمارت ريبورت يرجى التبديل لتبويب '📊 بيانات المراجعة (سمارت ريبورت)'.")
 
     # v15: فلتر الشركة الواحدة
     companies_data = apply_company_filter(companies_data)
