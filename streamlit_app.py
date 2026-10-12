@@ -293,16 +293,40 @@ st.markdown('<div class="title-divider"></div>', unsafe_allow_html=True)
 
 
 # -----------------------------
-# Helpers
+# Helpers & Database Integration
 # -----------------------------
+try:
+    from supabase_db import (
+        get_all_companies,
+        get_all_quarterly_reports,
+        migrate_smart_reports
+    )
+except Exception:
+    get_all_companies = None
+    get_all_quarterly_reports = None
+    migrate_smart_reports = None
+
 def safe_get_json(url):
+    # 1. Try local API if available
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=1.5)
         if response.status_code == 200:
             return response.json(), None
-        return [], response.text
+    except Exception:
+        pass
+
+    # 2. Fallback directly to Supabase cloud database
+    try:
+        if "companies" in url and get_all_companies:
+            data = get_all_companies()
+            return data, None
+        if "quarterly-reports" in url and get_all_quarterly_reports:
+            data = get_all_quarterly_reports()
+            return data, None
     except Exception as e:
         return [], str(e)
+
+    return [], "Connection to backend or database failed"
 
 
 def safe_post_files(url, files):
@@ -2345,10 +2369,35 @@ with tab2:
 
             st.divider()
             st.markdown("### 🔄 ترحيل البيانات للبرنامج الأساسي")
-            st.warning("""⚠️ **ملاحظة:** خاصية ترحيل البيانات للبرنامج الأساسي تعمل فقط عند تشغيل النظام محلياً على الكمبيوتر.
+            st.markdown("ترحيل وتخزين كافة تقارير الموظفين مباشرة إلى قاعدة البيانات السحابية (Supabase) لتنعكس فوراً في لوحة المؤشرات.")
             
-في النسخة السحابية (الرابط الإنترنت)، يمكنك تصدير بيانات سمارت ريبورت كملف Excel باستخدام زر التصدير أدناه، ثم استيرادها يدوياً في البرنامج الأساسي.
-            """)
+            mig_col1, mig_col2, mig_col3 = st.columns([1, 1, 2])
+            with mig_col1:
+                migration_year = st.selectbox("السنة المستهدفة للترحيل:", [2024, 2025, 2026, 2027], index=2, key="mig_year")
+            with mig_col2:
+                migration_quarter = st.selectbox("الربع المستهدف للترحيل:", [1, 2, 3, 4], index=2, key="mig_quarter")
+                
+            with mig_col3:
+                st.write("")
+                st.write("")
+                if st.button("🚀 بدء ترحيل البيانات وحفظها", type="primary", use_container_width=True):
+                    with st.spinner("جاري تسجيل الشركات وترحيل بيانات التقارير إلى السيرفر السحابي Supabase..."):
+                        try:
+                            if migrate_smart_reports:
+                                ok, msg = migrate_smart_reports(df, migration_year, migration_quarter, deleted_list)
+                                if ok:
+                                    st.session_state.pending_dashboard_year = int(migration_year)
+                                    st.session_state.pending_dashboard_quarter = str(migration_quarter)
+                                    st.session_state.pending_dashboard_mode = "لوحة كاملة"
+                                    st.success(f"🎉 {msg} تم ضبط الإعدادات تلقائياً. اذهب الآن إلى تبويب 'لوحة المؤشرات' للاطلاع عليها.")
+                                    time.sleep(1.5)
+                                    st.rerun()
+                                else:
+                                    st.error(msg)
+                            else:
+                                st.error("وحدة الاتصال بقاعدة البيانات غير متوفرة.")
+                        except Exception as e:
+                            st.error(f"حدث خطأ أثناء الترحيل: {e}")
 
             st.divider()
             st.markdown("### ⚙️ إدارة التقارير")
