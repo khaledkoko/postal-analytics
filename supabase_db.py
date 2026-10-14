@@ -102,10 +102,13 @@ def get_all_companies():
 
     result = []
     for r in rows:
+        lic = str(r[1]).strip()
+        if lic.endswith(".0"):
+            lic = lic[:-2]
         result.append({
             "id": r[0],
-            "رقم الرخصة": str(r[1]).strip(),
-            "license_number": str(r[1]).strip(),
+            "رقم الرخصة": lic,
+            "license_number": lic,
             "اسم الشركة": str(r[2]).strip(),
             "company_name": str(r[2]).strip(),
             "الاسم التجاري": str(r[2]).strip(),
@@ -147,13 +150,17 @@ def get_all_quarterly_reports():
         fin = calculate_financials(local_r, bulk_r, intl_r, ded_amount, review_diff)
         ind = calculate_indicators(local_c, local_w, local_r, bulk_c, bulk_w, bulk_r, intl_c, intl_w, intl_r, in_c, in_w, in_comm)
 
+        lic = str(r[3]).strip()
+        if lic.endswith(".0"):
+            lic = lic[:-2]
         item = {
             "id": r[0],
             "company_id": r[1],
             "الشركة": r[2],
             "اسم الشركة": r[2],
             "company_name": r[2],
-            "رقم الرخصة": str(r[3]).strip(),
+            "رقم الرخصة": lic,
+            "license_number": lic,
             "الفئة": r[4],
             "فئة الترخيص": r[4],
             "تستخدم الأوزان": bool(r[5]),
@@ -218,12 +225,14 @@ def migrate_smart_reports(df, target_year, target_quarter, deleted_keys=None):
         companies_map = {}
         for idx in range(len(df)):
             lic = str(lic_series.iloc[idx]).strip()
+            if lic.endswith(".0"):
+                lic = lic[:-2]
             name = str(name_series.iloc[idx]).strip()
             cat = str(cat_series.iloc[idx]).strip()
             if not lic or lic == "nan" or lic == "0" or not name or name == "nan":
                 continue
 
-            # Check if company exists
+            # Check if company exists by license
             cur.execute("SELECT id FROM companies WHERE license_number = %s", (lic,))
             row = cur.fetchone()
             if row:
@@ -253,6 +262,8 @@ def migrate_smart_reports(df, target_year, target_quarter, deleted_keys=None):
         inserted_count = 0
         for idx in range(len(df)):
             lic = str(lic_series.iloc[idx]).strip()
+            if lic.endswith(".0"):
+                lic = lic[:-2]
             name = str(name_series.iloc[idx]).strip()
             date_val = str(date_s.iloc[idx]).strip() if not date_s.empty else ""
 

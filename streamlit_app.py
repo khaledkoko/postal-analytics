@@ -2013,7 +2013,14 @@ with tab1:
         st.error(f"تعذر الاتصال بالخادم: {companies_error}")
     elif companies_data:
         df = pd.DataFrame(companies_data)
+        if "رقم الرخصة" in df.columns:
+            df["رقم الرخصة"] = df["رقم الرخصة"].astype(str).str.replace(r'\.0$', '', regex=True)
+        if "اسم الشركة" in df.columns:
+            df = df.drop_duplicates(subset=["اسم الشركة"])
+
         reports_df = apply_official_financials_to_df(pd.DataFrame(reports_data)) if reports_data else pd.DataFrame()
+        if not reports_df.empty and "رقم الرخصة" in reports_df.columns:
+            reports_df["رقم الرخصة"] = reports_df["رقم الرخصة"].astype(str).str.replace(r'\.0$', '', regex=True)
 
         # --- فلتر تلقائي: عرض فقط الشركات التي لها تقارير فعلية ---
         companies_with_reports = set()
@@ -2037,6 +2044,9 @@ with tab1:
         elif companies_with_reports:
             # بدون تحديد ربع: عرض الشركات التي لها أي تقرير فعلي فقط
             df = df[df["اسم الشركة"].isin(companies_with_reports)]
+
+        if "اسم الشركة" in df.columns:
+            df = df.drop_duplicates(subset=["اسم الشركة"])
 
         all_comps = sorted(df["اسم الشركة"].dropna().unique().tolist()) if "اسم الشركة" in df.columns else []
 
