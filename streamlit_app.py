@@ -1211,7 +1211,9 @@ def metric_card(label, value, color_class="blue"):
 
 def boxed_dataframe(df):
     st.markdown('<div class="table-box">', unsafe_allow_html=True)
-    st.dataframe(df, use_container_width=True)
+    row_count = len(df) if df is not None else 0
+    calc_height = min(520, max(180, (row_count + 1) * 38)) if row_count > 0 else 200
+    st.dataframe(df, use_container_width=True, height=calc_height)
     st.markdown('</div>', unsafe_allow_html=True)
 
 
@@ -2056,13 +2058,28 @@ with tab0:
         with ms_col1:
             active_rev_df = summary_df[summary_df["إجمالي الإيرادات"] > 0].sort_values("إجمالي الإيرادات", ascending=False)
             if not active_rev_df.empty:
+                # إذا زاد عدد الشركات عن 6 شركات، نعرض أعلى 5 شركات ونجمع باقي الشركات في شريحة "أخرى" للحفاظ على وضوح وجمال الرسم
+                if len(active_rev_df) > 6:
+                    top_n = active_rev_df.iloc[:5]
+                    other_sum = active_rev_df.iloc[5:]["إجمالي الإيرادات"].sum()
+                    other_count = len(active_rev_df) - 5
+                    donut_labels = [shorten_label(x, 24) for x in top_n["الشركة"].tolist()] + [f"باقي الشركات ({other_count})"]
+                    donut_values = top_n["إجمالي الإيرادات"].tolist() + [other_sum]
+                    donut_colors = ["#2563eb", "#059669", "#7c3aed", "#f97316", "#0891b2", "#94a3b8"]
+                    donut_title = "الحصة السوقية (أعلى 5 شركات + أخرى)"
+                else:
+                    donut_labels = [shorten_label(x, 26) for x in active_rev_df["الشركة"].tolist()]
+                    donut_values = active_rev_df["إجمالي الإيرادات"].tolist()
+                    donut_colors = ["#2563eb", "#059669", "#7c3aed", "#f97316", "#dc2626"]
+                    donut_title = "الحصة السوقية للشركات من إجمالي الإيرادات"
+
                 plotly_donut(
-                    [shorten_label(x, 26) for x in active_rev_df["الشركة"].tolist()],
-                    active_rev_df["إجمالي الإيرادات"].tolist(),
-                    "الحصة السوقية للشركات من إجمالي الإيرادات",
-                    colors=["#2563eb", "#059669", "#7c3aed", "#f97316", "#dc2626"]
+                    donut_labels,
+                    donut_values,
+                    donut_title,
+                    colors=donut_colors
                 )
-                st.caption("💡 **ماذا يعني هذا الشكل؟** يوضح النسبة المئوية لاستحواذ كل شركة من كعكة إيرادات السوق ككل. الشركة صاحبة النسبة الأكبر هي الأكثر سيطرة مبيعاتياً في هذا الربع.")
+                st.caption("💡 **ماذا يعني هذا الشكل؟** يوضح النسبة المئوية لاستحواذ كل شركة من كعكة إيرادات السوق ككل. (إذا زاد عدد الشركات النشطة، يتم عرض كبار المتصدرين وتجميع الباقي تلقائياً في شريحة موحدة لضمان وضوح الرسم).")
             else:
                 st.info("لا توجد إيرادات مسجلة للشركات في الفترة المحددة")
 
@@ -2081,7 +2098,7 @@ with tab0:
                 "النشاط": table_ms_df["حالة النشاط"]
             })
             boxed_dataframe(display_ms_df)
-            st.caption("💡 **شرح الجدول:** يرتب الشركات تنازلياً من الأعلى إيراداً إلى الأقل. علامة (🟢 نشطة) تعني أن الشركة حققت مبيعات فعلية، وعلامة (⚪ إقرار صفري) تعني أن الشركة لم تسجل أي إيرادات.")
+            st.caption("💡 **شرح الجدول:** يرتب كافة الشركات تنازلياً من الأعلى إيراداً إلى الأقل، ويتيح التمرير والبحث مهما بلغ عدد الشركات (🟢 نشطة / ⚪ إقرار صفري).")
 
         # ---------------------------------------------
         # 2. قسم مؤشرات الكفاءة التشغيلية
@@ -2138,13 +2155,15 @@ with tab0:
                 st.info("لا توجد مبالغ في هيكل الإيرادات")
 
         with eff_chart2:
-            # Unit Economics: Avg revenue per shipment per company
+            # Unit Economics: Avg revenue per shipment per company (أعلى 10 شركات للحفاظ على تناسق الرسم)
             if not with_shipments_df.empty:
-                shipment_comp_df = with_shipments_df.sort_values("متوسط عائد الشحنة", ascending=False)
+                shipment_comp_df = with_shipments_df.sort_values("متوسط عائد الشحنة", ascending=False).head(10)
+                n_shown = len(shipment_comp_df)
+                bar_title = f"أعلى {n_shown} شركات في متوسط عائد الشحنة (ج.م / شحنة)" if len(with_shipments_df) > 10 else "متوسط عائد الشحنة لكل شركة (ج.م / شحنة)"
                 plotly_horizontal_bar(
                     [shorten_label(x, 28) for x in shipment_comp_df["الشركة"].tolist()],
                     shipment_comp_df["متوسط عائد الشحنة"].tolist(),
-                    "متوسط عائد الشحنة لكل شركة (ج.م / شحنة)",
+                    bar_title,
                     "متوسط القيمة (ج.م)",
                     color="#0891b2"
                 )
