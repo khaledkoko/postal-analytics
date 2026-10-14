@@ -22,10 +22,8 @@ import json
 
 API_BASE_URL = "http://127.0.0.1:8000"
 
-# -------------------------------------------------------
-# v15: فلتر الشركة الواحدة - جواكسبريس للشحن فقط
-# لإزالة الفلتر لاحقاً: احذف هذا القسم وقسم apply_company_filter
-SINGLE_COMPANY_MODE = True
+# v15: فلتر الشركة الواحدة - تم إلغاؤه لعرض كافة الشركات
+SINGLE_COMPANY_MODE = False
 ALLOWED_COMPANY_NAME = "جواكسبريس للشحن"
 
 def apply_company_filter(data_list, name_keys=("اسم الشركة", "company_name", "الشركة")):
@@ -1556,6 +1554,171 @@ def plotly_stacked_bar(x_labels, series_data, title, y_title="القيمة"):
     st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
 
 
+def generate_executive_summary_excel(market_df, year_label, quarter_label, kpi_dict):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+
+    thin_border = Border(
+        left=Side(style='thin', color='CBD5E1'),
+        right=Side(style='thin', color='CBD5E1'),
+        top=Side(style='thin', color='CBD5E1'),
+        bottom=Side(style='thin', color='CBD5E1')
+    )
+    navy_fill = PatternFill(start_color='1E3A8A', end_color='1E3A8A', fill_type='solid')
+    header_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
+    title_font = Font(name='Calibri', size=16, bold=True, color='1E3A8A')
+    subtitle_font = Font(name='Calibri', size=11, italic=True, color='64748B')
+    bold_font = Font(name='Calibri', size=11, bold=True)
+    regular_font = Font(name='Calibri', size=11)
+    highlight_fill = PatternFill(start_color='FEF3C7', end_color='FEF3C7', fill_type='solid')
+
+    # Sheet 1: الملخص التنفيذي
+    ws1 = wb.active
+    ws1.title = "الملخص التنفيذي"
+    ws1.views.sheetView[0].rightToLeft = True
+
+    ws1.merge_cells("A1:D1")
+    ws1["A1"] = "قطاع تنظيم السوق البريدي - التقرير التنفيذي المالي والتشغيلي"
+    ws1["A1"].font = title_font
+    ws1["A1"].alignment = Alignment(horizontal="center", vertical="center")
+    ws1.row_dimensions[1].height = 32
+
+    ws1.merge_cells("A2:D2")
+    ws1["A2"] = f"الفترة المستهدفة: السنة {year_label} - الربع {quarter_label}"
+    ws1["A2"].font = subtitle_font
+    ws1["A2"].alignment = Alignment(horizontal="center", vertical="center")
+    ws1.row_dimensions[2].height = 20
+
+    ws1.append([])
+    ws1.append(["المؤشر المالي / التشغيلي", "القيمة", "الوحدة", "ملاحظات وتفاصيل"])
+    ws1.row_dimensions[4].height = 25
+    for col in range(1, 5):
+        cell = ws1.cell(row=4, column=col)
+        cell.fill = navy_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    kpis = [
+        ("إجمالي إيرادات السوق البريدي", kpi_dict.get("total_market_rev", 0.0), "جنيه مصري", "إجمالي إيرادات الصادر والمجمع"),
+        ("إجمالي الصادر الداخلي", kpi_dict.get("total_local_rev", 0.0), "جنيه مصري", "حركة النقل والبريد داخل الجمهورية"),
+        ("إجمالي البريد المجمع", kpi_dict.get("total_bulk_rev", 0.0), "جنيه مصري", "البريد السريع والمجمع"),
+        ("إجمالي الصادر الخارجي (الدولي)", kpi_dict.get("total_intl_rev", 0.0), "جنيه مصري", "الشحنات والطرود الصادرة دولياً"),
+        ("إجمالي عمولة الوارد الخارجي", kpi_dict.get("total_inbound_comm", 0.0), "جنيه مصري", "عمولات الشحنات الواردة من الخارج"),
+        ("العمولة الأساسية 10%", kpi_dict.get("base_comm", 0.0), "جنيه مصري", "10% من الإيرادات الخاضعة"),
+        ("(-) خصم المعاملات الوسيطة", kpi_dict.get("total_discount", 0.0), "جنيه مصري", "عمولات المعاملات الوسيطة المستبعدة"),
+        ("(+) فروق المراجعة", kpi_dict.get("total_diff", 0.0), "جنيه مصري", "فروق الفحص والتدقيق"),
+        ("إجمالي العمولة المستحقة للهيئة", kpi_dict.get("total_comm", 0.0), "جنيه مصري", "صافي العمولة واجبة السداد"),
+        ("ضريبة القيمة المضافة 14%", kpi_dict.get("total_vat", 0.0), "جنيه مصري", "الضريبة المقررة قانوناً"),
+        ("إجمالي المديونية المستحقة", kpi_dict.get("total_debt", 0.0), "جنيه مصري", "شامل العمولة وضريبة القيمة المضافة"),
+        ("إجمالي عدد الشحنات المنفذة", kpi_dict.get("total_shipments", 0), "شحنة", "إجمالي حجم العمل بالعدد"),
+        ("متوسط إيراد الشحنة بالسوق", kpi_dict.get("avg_shipment_price", 0.0), "جنيه / شحنة", "متوسط سعر الشحنة العام"),
+        ("عدد الشركات المرخصة بالتقرير", kpi_dict.get("companies_count", 0), "شركة", "إجمالي الشركات المسجلة"),
+        ("عدد الشركات ذات النشاط الفعلي", kpi_dict.get("active_companies_count", 0), "شركة", "الشركات التي حققت إيرادات > 0"),
+    ]
+
+    for r_idx, (name, val, unit, notes) in enumerate(kpis, start=5):
+        ws1.row_dimensions[r_idx].height = 22
+        c1 = ws1.cell(row=r_idx, column=1, value=name)
+        c2 = ws1.cell(row=r_idx, column=2, value=val)
+        c3 = ws1.cell(row=r_idx, column=3, value=unit)
+        c4 = ws1.cell(row=r_idx, column=4, value=notes)
+
+        is_highlight = "إجمالي العمولة" in name or "إجمالي المديونية" in name or "إجمالي إيرادات" in name
+        c1.font = bold_font if is_highlight else regular_font
+        c2.font = bold_font
+        c3.font = regular_font
+        c4.font = regular_font
+
+        c1.alignment = Alignment(horizontal="right", vertical="center")
+        c2.alignment = Alignment(horizontal="center", vertical="center")
+        c3.alignment = Alignment(horizontal="center", vertical="center")
+        c4.alignment = Alignment(horizontal="right", vertical="center")
+
+        if isinstance(val, float):
+            c2.number_format = '#,##0.00'
+        elif isinstance(val, int):
+            c2.number_format = '#,##0'
+
+        for cell in [c1, c2, c3, c4]:
+            cell.border = thin_border
+            if is_highlight:
+                cell.fill = highlight_fill
+
+    # Sheet 2: الحصص السوقية وترتيب الشركات
+    ws2 = wb.create_sheet(title="الحصص السوقية والترتيب")
+    ws2.views.sheetView[0].rightToLeft = True
+
+    ws2.merge_cells("A1:K1")
+    ws2["A1"] = f"ترتيب الشركات والحصص السوقية - السنة {year_label} الربع {quarter_label}"
+    ws2["A1"].font = title_font
+    ws2["A1"].alignment = Alignment(horizontal="center", vertical="center")
+    ws2.row_dimensions[1].height = 30
+
+    ws2.append([])
+    headers2 = [
+        "الترتيب", "اسم الشركة", "فئة الترخيص",
+        "إيراد الصادر الداخلي", "إيراد البريد المجمع", "إيراد الصادر الدولي",
+        "إجمالي الإيرادات", "الحصة السوقية (%)", "عدد الشحنات",
+        "متوسط عائد الشحنة", "صافي العمولة المستحقة"
+    ]
+    ws2.append(headers2)
+    ws2.row_dimensions[3].height = 25
+    for col in range(1, len(headers2) + 1):
+        cell = ws2.cell(row=3, column=col)
+        cell.fill = navy_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    total_market_rev = kpi_dict.get("total_market_rev", 0.0)
+
+    for rank, (_, row) in enumerate(market_df.iterrows(), start=1):
+        r_idx = rank + 3
+        ws2.row_dimensions[r_idx].height = 20
+        c_name = row.get("الشركة", "")
+        c_cat = row.get("الفئة", "")
+        loc_rev = float(row.get("إيراد الصادر الداخلي", 0.0) or 0.0)
+        blk_rev = float(row.get("إيراد البريد المجمع", 0.0) or 0.0)
+        intl_rev = float(row.get("إيراد الصادر الخارجي", 0.0) or 0.0)
+        tot_rev = loc_rev + blk_rev + intl_rev
+        share = (tot_rev / total_market_rev * 100) if total_market_rev > 0 else 0.0
+        shipments = int(row.get("إجمالي عدد الشحنات", 0) or 0)
+        avg_s = (tot_rev / shipments) if shipments > 0 else 0.0
+        comm = float(row.get("إجمالي العمولة المحسوبة", row.get("إجمالي العمولة المستحقة", 0.0)) or 0.0)
+
+        vals = [rank, c_name, c_cat, loc_rev, blk_rev, intl_rev, tot_rev, share, shipments, avg_s, comm]
+        for c_idx, val in enumerate(vals, start=1):
+            cell = ws2.cell(row=r_idx, column=c_idx, value=val)
+            cell.font = regular_font
+            cell.border = thin_border
+            if c_idx in [1, 3]:
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            elif c_idx == 2:
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+            else:
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+
+            if c_idx in [4, 5, 6, 7, 10, 11]:
+                cell.number_format = '#,##0.00'
+            elif c_idx == 8:
+                cell.number_format = '0.00"%"'
+            elif c_idx == 9:
+                cell.number_format = '#,##0'
+
+    # Auto-adjust column widths
+    for ws in [ws1, ws2]:
+        for col in ws.columns:
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = get_column_letter(col[0].column)
+            ws.column_dimensions[col_letter].width = max(max_len + 4, 14)
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 # -----------------------------
 # Session state defaults
 # -----------------------------
@@ -1757,7 +1920,54 @@ with tab0:
     companies_count = len(companies_df) if not companies_df.empty else 0
     reports_count = len(filtered_reports_df) if not filtered_reports_df.empty else 0
 
-    st.markdown('<div class="subsection-title">مؤشرات النشاط</div>', unsafe_allow_html=True)
+    total_market_revenue = float(total_local_revenue) + float(total_collected_revenue) + float(total_international_revenue)
+    avg_market_shipment_price = (total_market_revenue / total_shipments) if total_shipments > 0 else 0.0
+
+    col_hdr, col_dl = st.columns([3, 1.2])
+    with col_hdr:
+        st.markdown('<div class="subsection-title" style="margin-top:0;">مؤشرات النشاط المالي والتشغيلي</div>', unsafe_allow_html=True)
+    with col_dl:
+        if not filtered_reports_df.empty:
+            active_count = 0
+            if "إيراد الصادر الداخلي" in filtered_reports_df.columns:
+                rev_sum_s = (
+                    filtered_reports_df["إيراد الصادر الداخلي"].fillna(0)
+                    + (filtered_reports_df["إيراد البريد المجمع"].fillna(0) if "إيراد البريد المجمع" in filtered_reports_df.columns else 0)
+                    + (filtered_reports_df["إيراد الصادر الخارجي"].fillna(0) if "إيراد الصادر الخارجي" in filtered_reports_df.columns else 0)
+                )
+                active_count = int((rev_sum_s > 0).sum())
+
+            kpi_dict = {
+                "total_market_rev": total_market_revenue,
+                "total_local_rev": total_local_revenue,
+                "total_bulk_rev": total_collected_revenue,
+                "total_intl_rev": total_international_revenue,
+                "total_inbound_comm": total_inbound_commission,
+                "base_comm": base_commission,
+                "total_discount": total_intermediary_discount,
+                "total_diff": total_review_diff,
+                "total_comm": total_commission,
+                "total_vat": total_vat,
+                "total_debt": total_indebtedness_sum,
+                "total_shipments": int(total_shipments),
+                "avg_shipment_price": avg_market_shipment_price,
+                "companies_count": companies_count,
+                "active_companies_count": active_count,
+            }
+
+            # Generate and allow direct download
+            try:
+                exec_excel = generate_executive_summary_excel(filtered_reports_df, str(selected_year), str(selected_quarter), kpi_dict)
+                st.download_button(
+                    label="📥 تحميل التقرير التنفيذي (Excel)",
+                    data=exec_excel,
+                    file_name=f"تقرير_تنفيذي_{selected_year}_Q{selected_quarter}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+            except Exception as e:
+                st.caption(f"خطأ في التقرير التنفيذي: {e}")
+
     n1, n2, n3, n4 = st.columns(4)
 
     with n1:
@@ -1790,7 +2000,7 @@ with tab0:
     extra1, extra2, extra3 = st.columns(3)
 
     with extra1:
-        metric_card("إجمالي عدد الشحنات", f"{int(total_shipments)}", "blue")
+        metric_card("إجمالي عدد الشحنات", f"{int(total_shipments):,}", "blue")
     with extra2:
         metric_card("متوسط سعر شحنة الصادر الداخلي", f"{avg_local_shipment_price:,.2f}", "cyan")
     with extra3:
@@ -1816,11 +2026,124 @@ with tab0:
             }).sort_values("إجمالي العمولة المحسوبة", ascending=False)
         )
 
+        # حساب إجمالي الإيرادات والحصة السوقية ومتوسط الشحنة
+        summary_df["إجمالي الإيرادات"] = (
+            summary_df["إيراد الصادر الداخلي"].fillna(0)
+            + summary_df["إيراد البريد المجمع"].fillna(0)
+            + summary_df["إيراد الصادر الخارجي"].fillna(0)
+        )
+        total_market_calc = summary_df["إجمالي الإيرادات"].sum()
+        summary_df["الحصة السوقية %"] = (
+            (summary_df["إجمالي الإيرادات"] / total_market_calc * 100).round(2)
+            if total_market_calc > 0 else 0.0
+        )
+        summary_df["متوسط عائد الشحنة"] = summary_df.apply(
+            lambda r: round(r["إجمالي الإيرادات"] / r["إجمالي عدد الشحنات"], 2)
+            if r["إجمالي عدد الشحنات"] > 0 else 0.0,
+            axis=1
+        )
+
+        # ---------------------------------------------
+        # 1. قسم الحصة السوقية ونسبة الاستحواذ
+        # ---------------------------------------------
+        st.markdown('<div class="subsection-title">📊 الحصة السوقية ونسبة الاستحواذ على إيرادات السوق</div>', unsafe_allow_html=True)
+        ms_col1, ms_col2 = st.columns([1.1, 1.3])
+
+        with ms_col1:
+            active_rev_df = summary_df[summary_df["إجمالي الإيرادات"] > 0].sort_values("إجمالي الإيرادات", ascending=False)
+            if not active_rev_df.empty:
+                plotly_donut(
+                    [shorten_label(x, 26) for x in active_rev_df["الشركة"].tolist()],
+                    active_rev_df["إجمالي الإيرادات"].tolist(),
+                    "الحصة السوقية للشركات من إجمالي الإيرادات",
+                    colors=["#2563eb", "#059669", "#7c3aed", "#f97316", "#dc2626"]
+                )
+            else:
+                st.info("لا توجد إيرادات مسجلة للشركات في الفترة المحددة")
+
+        with ms_col2:
+            st.markdown('<div class="section-title" style="font-size: 16px; margin-bottom: 12px;">🏆 جدول ترتيب الشركات والحصص السوقية</div>', unsafe_allow_html=True)
+            table_ms_df = summary_df.copy().sort_values("إجمالي الإيرادات", ascending=False).reset_index(drop=True)
+            table_ms_df["الترتيب"] = range(1, len(table_ms_df) + 1)
+            table_ms_df["حالة النشاط"] = table_ms_df["إجمالي الإيرادات"].apply(lambda v: "🟢 نشطة" if v > 0 else "⚪ إقرار صفري")
+
+            display_ms_df = pd.DataFrame({
+                "الترتيب": table_ms_df["الترتيب"],
+                "الشركة": table_ms_df["الشركة"],
+                "الفئة": table_ms_df["الفئة"],
+                "إجمالي الإيرادات (ج.م)": table_ms_df["إجمالي الإيرادات"].apply(lambda x: f"{x:,.2f}"),
+                "الحصة السوقية": table_ms_df["الحصة السوقية %"].apply(lambda x: f"{x:.2f}%"),
+                "النشاط": table_ms_df["حالة النشاط"]
+            })
+            boxed_dataframe(display_ms_df)
+
+        # ---------------------------------------------
+        # 2. قسم مؤشرات الكفاءة التشغيلية
+        # ---------------------------------------------
+        st.markdown('<div class="subsection-title">⚡ مؤشرات الكفاءة التشغيلية وهيكل الإيرادات</div>', unsafe_allow_html=True)
+
+        with_shipments_df = summary_df[summary_df["إجمالي عدد الشحنات"] > 0]
+        if not with_shipments_df.empty:
+            top_avg_co = with_shipments_df.sort_values("متوسط عائد الشحنة", ascending=False).iloc[0]
+            top_avg_name = shorten_label(top_avg_co["الشركة"], 20)
+            top_avg_val = f"{top_avg_co['متوسط عائد الشحنة']:,.2f} ج.م"
+        else:
+            top_avg_name = "لا توجد شحنات"
+            top_avg_val = "0.00 ج.م"
+
+        overall_avg_val = f"{avg_market_shipment_price:,.2f} ج.م"
+
+        if not with_shipments_df.empty:
+            top_vol_co = with_shipments_df.sort_values("إجمالي عدد الشحنات", ascending=False).iloc[0]
+            top_vol_name = shorten_label(top_vol_co["الشركة"], 20)
+            top_vol_val = f"{int(top_vol_co['إجمالي عدد الشحنات']):,} شحنة"
+        else:
+            top_vol_name = "لا توجد شحنات"
+            top_vol_val = "0 شحنة"
+
+        eff_c1, eff_c2, eff_c3 = st.columns(3)
+        with eff_c1:
+            metric_card(f"أعلى عائد شحنة ({top_avg_name})", top_avg_val, "purple")
+        with eff_c2:
+            metric_card("متوسط عائد الشحنة العام بالسوق", overall_avg_val, "cyan")
+        with eff_c3:
+            metric_card(f"أعلى إنتاجية شحنات ({top_vol_name})", top_vol_val, "orange")
+
+        eff_chart1, eff_chart2 = st.columns(2)
+        with eff_chart1:
+            # Revenue Mix Donut Chart
+            rev_mix_labels = ["الصادر الداخلي", "الصادر الخارجي", "البريد المجمع", "عمولة الوارد"]
+            rev_mix_vals = [total_local_revenue, total_international_revenue, total_collected_revenue, total_inbound_commission]
+            active_mix = [(l, v) for l, v in zip(rev_mix_labels, rev_mix_vals) if v > 0]
+            if active_mix:
+                plotly_donut(
+                    [x[0] for x in active_mix],
+                    [x[1] for x in active_mix],
+                    "هيكل الإيرادات العام للقطاع (Revenue Mix)",
+                    colors=["#2563eb", "#059669", "#7c3aed", "#ea580c"]
+                )
+            else:
+                st.info("لا توجد مبالغ في هيكل الإيرادات")
+
+        with eff_chart2:
+            # Unit Economics: Avg revenue per shipment per company
+            if not with_shipments_df.empty:
+                shipment_comp_df = with_shipments_df.sort_values("متوسط عائد الشحنة", ascending=False)
+                plotly_horizontal_bar(
+                    [shorten_label(x, 28) for x in shipment_comp_df["الشركة"].tolist()],
+                    shipment_comp_df["متوسط عائد الشحنة"].tolist(),
+                    "متوسط عائد الشحنة لكل شركة (ج.م / شحنة)",
+                    "متوسط القيمة (ج.م)",
+                    color="#0891b2"
+                )
+            else:
+                st.info("لا توجد بيانات عدد شحنات لحساب متوسط العائد")
+
         row1_col1, row1_col2 = st.columns(2)
 
         with row1_col1:
             if not companies_df.empty and "الفئة" in companies_df.columns:
-                st.markdown('<div class="subsection-title">توزيع الشركات حسب الفئة</div>', unsafe_allow_html=True)
+                st.markdown('<div class="subsection-title">توزيع عدد الشركات المسجلة حسب الفئة</div>', unsafe_allow_html=True)
 
                 normalized_company_categories = (
                     companies_df["الفئة"]
@@ -1839,7 +2162,7 @@ with tab0:
                 plotly_donut(
                     category_counts.index.tolist(),
                     category_counts.values.tolist(),
-                    "توزيع الشركات حسب الفئة",
+                    "توزيع عدد الشركات المسجلة حسب الفئة (بالعدد)",
                     colors=["#2563eb", "#f97316", "#16a34a", "#dc2626"]
                 )
 
