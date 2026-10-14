@@ -585,7 +585,7 @@ def apply_official_financials_to_df(df):
     if df is None or df.empty:
         return df
     work = df.copy()
-    for col in ["إيراد الصادر الداخلي", "إيراد البريد المجمع", "إيراد الصادر الخارجي", "خصم المعاملات الوسيطة", "فروق المراجعة"]:
+    for col in ["إيراد الصادر الداخلي", "إيراد البريد المجمع", "إيراد الصادر الخارجي", "عمولة الوارد", "خصم المعاملات الوسيطة", "فروق المراجعة"]:
         if col not in work.columns:
             work[col] = 0.0
         work[col] = pd.to_numeric(work[col], errors="coerce").fillna(0.0)
@@ -2010,6 +2010,10 @@ with tab0:
         work_df = filtered_reports_df.copy()
 
         work_df = apply_official_financials_to_df(work_df)
+        for c in ["إجمالي عدد الشحنات", "إجمالي الأوزان", "عمولة الوارد", "إجمالي العمولة المحسوبة", "خصم المعاملات الوسيطة", "فروق المراجعة", "ضريبة القيمة المضافة"]:
+            if c not in work_df.columns:
+                work_df[c] = 0.0
+            work_df[c] = pd.to_numeric(work_df[c], errors="coerce").fillna(0.0)
 
         summary_df = (
             work_df.groupby(["الشركة", "الفئة"], as_index=False).agg({
