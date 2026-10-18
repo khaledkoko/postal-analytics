@@ -322,3 +322,65 @@ def migrate_smart_reports(df, target_year, target_quarter, deleted_keys=None):
         conn.rollback()
         conn.close()
         return False, f"حدث خطأ أثناء الترحيل إلى السيرفر السحابي: {e}"
+
+
+# ─────────────────────────────────────────────────────────────
+# إدارة التقارير المحذوفة في Supabase (بديل عن deleted_reports.json)
+# ─────────────────────────────────────────────────────────────
+
+def _ensure_deleted_reports_table(conn):
+    """ينشئ جدول deleted_reports في Supabase لو مش موجود."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS deleted_reports (
+                id SERIAL PRIMARY KEY,
+                report_key TEXT UNIQUE NOT NULL,
+                deleted_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+    conn.commit()
+
+
+def get_deleted_reports() -> list:
+    """يجيب قائمة مفاتيح التقارير المحذوفة من Supabase."""
+    try:
+        conn = get_db_connection()
+        _ensure_deleted_reports_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT report_key FROM deleted_reports")
+            rows = cur.fetchall()
+        conn.close()
+        return [r[0] for r in rows]
+    except Exception:
+        return []
+
+
+def add_deleted_report(key: str) -> bool:
+    """يضيف مفتاح تقرير للقائمة المحذوفة في Supabase."""
+    try:
+        conn = get_db_connection()
+        _ensure_deleted_reports_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO deleted_reports (report_key) VALUES (%s) ON CONFLICT (report_key) DO NOTHING",
+                (key,)
+            )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+def clear_deleted_reports() -> bool:
+    """يمسح كل التقارير المحذوفة من Supabase (استعادة الكل)."""
+    try:
+        conn = get_db_connection()
+        _ensure_deleted_reports_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM deleted_reports")
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        return False

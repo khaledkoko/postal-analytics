@@ -297,12 +297,18 @@ try:
     from supabase_db import (
         get_all_companies,
         get_all_quarterly_reports,
-        migrate_smart_reports
+        migrate_smart_reports,
+        get_deleted_reports,
+        add_deleted_report,
+        clear_deleted_reports
     )
 except Exception:
     get_all_companies = None
     get_all_quarterly_reports = None
     migrate_smart_reports = None
+    get_deleted_reports = None
+    add_deleted_report = None
+    clear_deleted_reports = None
 
 def safe_get_json(url):
     # 1. Try local API if available
@@ -2522,11 +2528,16 @@ with tab2:
             except:
                 pass
 
-        # Load deleted reports
+        # Load deleted reports from Supabase (persistent across restarts)
         import json
-        deleted_file = 'deleted_reports.json'
+        deleted_file = 'deleted_reports.json'  # kept for fallback only
         deleted_list = []
-        if os.path.exists(deleted_file):
+        if get_deleted_reports is not None:
+            try:
+                deleted_list = get_deleted_reports()
+            except Exception:
+                pass
+        if not deleted_list and os.path.exists(deleted_file):
             try:
                 with open(deleted_file, 'r', encoding='utf-8') as f:
                     deleted_list = json.load(f)
@@ -2851,10 +2862,16 @@ with tab2:
                                     if delete_password == "8585":
                                         if report_to_delete and report_to_delete in options_map:
                                             key = options_map[report_to_delete]
+                                            # حفظ في Supabase (دائم) + ملف محلي (احتياطي)
+                                            if add_deleted_report is not None:
+                                                add_deleted_report(key)
                                             if key not in deleted_list:
                                                 deleted_list.append(key)
-                                                with open(deleted_file, 'w', encoding='utf-8') as f:
-                                                    json.dump(deleted_list, f, ensure_ascii=False)
+                                                try:
+                                                    with open(deleted_file, 'w', encoding='utf-8') as f:
+                                                        json.dump(deleted_list, f, ensure_ascii=False)
+                                                except Exception:
+                                                    pass
                                             st.success("تم حذف التقرير بنجاح!")
                                             time.sleep(1)
                                             st.rerun()
@@ -2862,8 +2879,14 @@ with tab2:
                                         st.error("كلمة المرور خاطئة!")
                             with col_del2:
                                 if st.button("🔄 استعادة الكل", use_container_width=True):
-                                    with open(deleted_file, 'w', encoding='utf-8') as f:
-                                        json.dump([], f)
+                                    # مسح من Supabase + الملف المحلي
+                                    if clear_deleted_reports is not None:
+                                        clear_deleted_reports()
+                                    try:
+                                        with open(deleted_file, 'w', encoding='utf-8') as f:
+                                            json.dump([], f)
+                                    except Exception:
+                                        pass
                                     st.success("تم استعادة جميع التقارير بنجاح!")
                                     time.sleep(1)
                                     st.rerun()
