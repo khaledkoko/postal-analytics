@@ -2129,75 +2129,96 @@ with tab0:
             st.caption("💡 **شرح الجدول:** يرتب كافة الشركات تنازلياً من الأعلى عمولة مستحقة للهيئة إلى الأقل، ويتيح التمرير والبحث مهما بلغ عدد الشركات (🟢 نشطة / ⚪ إقرار صفري).")
 
         # ---------------------------------------------
-        # 2. قسم مؤشرات الكفاءة التشغيلية
+        # 2. قسم تحليل توزيع العمولة المستحقة
         # ---------------------------------------------
-        st.markdown('<div class="subsection-title">⚡ مؤشرات الكفاءة التشغيلية وهيكل الإيرادات</div>', unsafe_allow_html=True)
+        st.markdown('<div class="subsection-title">💰 تحليل توزيع العمولة المستحقة</div>', unsafe_allow_html=True)
 
-        with_shipments_df = summary_df[summary_df["إجمالي عدد الشحنات"] > 0]
-        if not with_shipments_df.empty:
-            top_avg_co = with_shipments_df.sort_values("متوسط عائد الشحنة", ascending=False).iloc[0]
-            top_avg_name = shorten_label(top_avg_co["الشركة"], 20)
-            top_avg_val = f"{top_avg_co['متوسط عائد الشحنة']:,.2f} ج.م"
+        # حساب مؤشرات العمولة
+        active_comm_summary = summary_df[summary_df["إجمالي العمولة المستحقة"] > 0]
+        total_comm_market = summary_df["إجمالي العمولة المستحقة"].sum()
+        num_active_companies = len(active_comm_summary)
+
+        # أعلى شركة في العمولة المستحقة
+        if not active_comm_summary.empty:
+            top_comm_co = active_comm_summary.iloc[0]
+            top_comm_name = shorten_label(top_comm_co["الشركة"], 20)
+            top_comm_val = f"{top_comm_co['إجمالي العمولة المستحقة']:,.2f} ج.م"
+            top_comm_share = f"({top_comm_co['نسبة العمولة %']:.1f}%)"
         else:
-            top_avg_name = "لا توجد شحنات"
-            top_avg_val = "0.00 ج.م"
+            top_comm_name = "—"
+            top_comm_val = "0.00 ج.م"
+            top_comm_share = ""
 
-        overall_avg_val = f"{avg_market_shipment_price:,.2f} ج.م"
+        # متوسط العمولة المستحقة للشركة الواحدة
+        avg_comm_per_company = (total_comm_market / num_active_companies) if num_active_companies > 0 else 0
+        avg_comm_val = f"{avg_comm_per_company:,.2f} ج.م"
 
-        if not with_shipments_df.empty:
-            top_vol_co = with_shipments_df.sort_values("إجمالي عدد الشحنات", ascending=False).iloc[0]
-            top_vol_name = shorten_label(top_vol_co["الشركة"], 20)
-            top_vol_val = f"{int(top_vol_co['إجمالي عدد الشحنات']):,} شحنة"
-        else:
-            top_vol_name = "لا توجد شحنات"
-            top_vol_val = "0 شحنة"
+        # نسبة العمولة الإجمالية من إجمالي الإيرادات
+        total_revenue_all = summary_df["إجمالي الإيرادات"].sum()
+        comm_to_revenue_ratio = (total_comm_market / total_revenue_all * 100) if total_revenue_all > 0 else 0
 
-        eff_c1, eff_c2, eff_c3 = st.columns(3)
-        with eff_c1:
-            metric_card(f"أعلى عائد شحنة ({top_avg_name})", top_avg_val, "purple")
-        with eff_c2:
-            metric_card("متوسط عائد الشحنة العام بالسوق", overall_avg_val, "cyan")
-        with eff_c3:
-            metric_card(f"أعلى إنتاجية شحنات ({top_vol_name})", top_vol_val, "orange")
+        comm_c1, comm_c2, comm_c3 = st.columns(3)
+        with comm_c1:
+            metric_card(f"أعلى عمولة مستحقة {top_comm_share}\n({top_comm_name})", top_comm_val, "red red-pulse")
+        with comm_c2:
+            metric_card("متوسط العمولة للشركة الواحدة", avg_comm_val, "purple")
+        with comm_c3:
+            metric_card("نسبة العمولة من إجمالي الإيرادات", f"{comm_to_revenue_ratio:.2f}%", "cyan")
 
-        st.caption("💡 **ماذا تعني هذه المؤشرات الثلاثة؟**\n"
-                   "- **أعلى عائد شحنة:** الشركة التي تبيع شحناتها بأعلى سعر في المتوسط (يدل على بضائع قيّمة أو أوزان ثقيلة أو خدمات ممتازة).\n"
-                   "- **متوسط عائد الشحنة العام بالسوق:** معدل سعر الشحنة الواحدة في مصر ككل (إجمالي الإيرادات ÷ إجمالي عدد الشحنات = 215.63 ج.م).\n"
-                   "- **أعلى إنتاجية شحنات:** الشركة التي سلمت أكبر عدد فعلي من الطرود والشحنات خلال الفترة.")
+        st.caption("💡 **ماذا تعني هذه المؤشرات؟**\n"
+                   f"- **أعلى عمولة مستحقة:** الشركة الأكثر مساهمة في العمولة للبريد المصري خلال الفترة المحددة.\n"
+                   f"- **متوسط العمولة للشركة:** إجمالي العمولة ÷ عدد الشركات النشطة ({num_active_companies} شركة)، يكشف توازن التوزيع بين الشركات.\n"
+                   f"- **نسبة العمولة من الإيرادات:** معدل العمولة الفعلية المحققة من كل الإيرادات الخاضعة للضريبة.")
 
-        eff_chart1, eff_chart2 = st.columns(2)
-        with eff_chart1:
-            # Revenue Mix Donut Chart
-            rev_mix_labels = ["الصادر الداخلي", "الصادر الخارجي", "البريد المجمع", "عمولة الوارد"]
-            rev_mix_vals = [total_local_revenue, total_international_revenue, total_collected_revenue, total_inbound_commission]
-            active_mix = [(l, v) for l, v in zip(rev_mix_labels, rev_mix_vals) if v > 0]
-            if active_mix:
-                plotly_donut(
-                    [x[0] for x in active_mix],
-                    [x[1] for x in active_mix],
-                    "هيكل الإيرادات العام للقطاع (Revenue Mix)",
-                    colors=["#2563eb", "#059669", "#7c3aed", "#ea580c"]
+        comm_chart1, comm_chart2 = st.columns(2)
+
+        with comm_chart1:
+            # مخطط شريطي: أعلى شركات في العمولة المستحقة
+            if not active_comm_summary.empty:
+                top_comm_df = active_comm_summary.head(10)
+                n_comm = len(top_comm_df)
+                bar_comm_title = (
+                    f"أعلى {n_comm} شركات في إجمالي العمولة المستحقة (ج.م)"
+                    if len(active_comm_summary) > 10
+                    else "العمولة المستحقة لكل شركة (ج.م)"
                 )
-                st.caption("💡 **ما هو هيكل الإيرادات (Revenue Mix)؟** يوضح مصادر الأموال في القطاع البريدي: كم نسبة الإيرادات القادمة من الشحن الدولي الخارجي (64.1%) مقابل الشحن الداخلي المحلي (35.9%).")
-            else:
-                st.info("لا توجد مبالغ في هيكل الإيرادات")
-
-        with eff_chart2:
-            # Unit Economics: Avg revenue per shipment per company (أعلى 10 شركات للحفاظ على تناسق الرسم)
-            if not with_shipments_df.empty:
-                shipment_comp_df = with_shipments_df.sort_values("متوسط عائد الشحنة", ascending=False).head(10)
-                n_shown = len(shipment_comp_df)
-                bar_title = f"أعلى {n_shown} شركات في متوسط عائد الشحنة (ج.م / شحنة)" if len(with_shipments_df) > 10 else "متوسط عائد الشحنة لكل شركة (ج.م / شحنة)"
                 plotly_horizontal_bar(
-                    [shorten_label(x, 28) for x in shipment_comp_df["الشركة"].tolist()],
-                    shipment_comp_df["متوسط عائد الشحنة"].tolist(),
-                    bar_title,
-                    "متوسط القيمة (ج.م)",
-                    color="#0891b2"
+                    [shorten_label(x, 28) for x in top_comm_df["الشركة"].tolist()],
+                    top_comm_df["إجمالي العمولة المستحقة"].tolist(),
+                    bar_comm_title,
+                    "العمولة المستحقة (ج.م)",
+                    color="#dc2626"
                 )
-                st.caption("💡 **ماذا يعني متوسط عائد الشحنة؟** يقيس متوسط ما تحصّله الشركة من العميل عن كل شحنة (إجمالي إيراد الشركة ÷ عدد شحناتها). يفيد في كشف سياسات التسعير بين الشركات.")
+                st.caption("💡 **ترتيب الشركات حسب العمولة المستحقة:** يُظهر أكثر الشركات توليداً للعمولة لصالح هيئة البريد المصري خلال الفترة المختارة.")
             else:
-                st.info("لا توجد بيانات عدد شحنات لحساب متوسط العائد")
+                st.info("لا توجد بيانات عمولة")
+
+        with comm_chart2:
+            # دونات: توزيع العمولة المستحقة حسب مصدر الإيراد
+            comm_local = (total_local_revenue + total_collected_revenue) * 0.10
+            comm_international = total_international_revenue * 0.10
+            comm_inbound = total_inbound_commission
+
+            donut_labels = []
+            donut_vals = []
+            if comm_local > 0:
+                donut_labels.append("عمولة الصادر الداخلي والمجمع")
+                donut_vals.append(round(comm_local, 2))
+            if comm_international > 0:
+                donut_labels.append("عمولة الصادر الخارجي")
+                donut_vals.append(round(comm_international, 2))
+            if comm_inbound > 0:
+                donut_labels.append("عمولة الوارد")
+                donut_vals.append(round(comm_inbound, 2))
+
+            if donut_labels:
+                plotly_donut(
+                    donut_labels,
+                    donut_vals,
+                    "توزيع العمولة المستحقة حسب مصدر الإيراد",
+                    colors=["#2563eb", "#059669", "#ea580c"]
+                )
+                st.caption("💡 **هيكل العمولة:** يوضح نسبة مساهمة كل مصدر إيراد (داخلي، خارجي، وارد) في تكوين إجمالي العمولة المستحقة للبريد المصري.")
 
         row1_col1, row1_col2 = st.columns(2)
 
