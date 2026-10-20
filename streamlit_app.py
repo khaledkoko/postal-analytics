@@ -2045,16 +2045,17 @@ with tab0:
                 "إيراد البريد المجمع": "sum",
                 "إيراد الصادر الخارجي": "sum",
                 "عمولة الوارد": "sum",
+                "إجمالي العمولة المستحقة": "sum",
                 "إجمالي العمولة المحسوبة": "sum",
                 "خصم المعاملات الوسيطة": "sum",
                 "فروق المراجعة": "sum",
                 "ضريبة القيمة المضافة": "sum",
                 "إجمالي عدد الشحنات": "sum",
                 "إجمالي الأوزان": "sum"
-            }).sort_values("إجمالي العمولة المحسوبة", ascending=False)
+            }).sort_values("إجمالي العمولة المستحقة", ascending=False)
         )
 
-        # حساب إجمالي الإيرادات والحصة السوقية ومتوسط الشحنة
+        # حساب إجمالي الإيرادات والحصة من العمولة ومتوسط الشحنة
         summary_df["إجمالي الإيرادات"] = (
             summary_df["إيراد الصادر الداخلي"].fillna(0)
             + summary_df["إيراد البريد المجمع"].fillna(0)
@@ -2065,6 +2066,11 @@ with tab0:
             (summary_df["إجمالي الإيرادات"] / total_market_calc * 100).round(2)
             if total_market_calc > 0 else 0.0
         )
+        total_comm_calc = summary_df["إجمالي العمولة المستحقة"].sum()
+        summary_df["نسبة العمولة %"] = (
+            (summary_df["إجمالي العمولة المستحقة"] / total_comm_calc * 100).round(2)
+            if total_comm_calc > 0 else 0.0
+        )
         summary_df["متوسط عائد الشحنة"] = summary_df.apply(
             lambda r: round(r["إجمالي الإيرادات"] / r["إجمالي عدد الشحنات"], 2)
             if r["إجمالي عدد الشحنات"] > 0 else 0.0,
@@ -2072,28 +2078,28 @@ with tab0:
         )
 
         # ---------------------------------------------
-        # 1. قسم الحصة السوقية ونسبة الاستحواذ
+        # 1. قسم الحصة السوقية ونسبة الاستحواذ على العمولة المستحقة
         # ---------------------------------------------
-        st.markdown('<div class="subsection-title">📊 الحصة السوقية ونسبة الاستحواذ على إيرادات السوق</div>', unsafe_allow_html=True)
+        st.markdown('<div class="subsection-title">📊 الحصة ونسبة الاستحواذ على إجمالي العمولة المستحقة</div>', unsafe_allow_html=True)
         ms_col1, ms_col2 = st.columns([1.1, 1.3])
 
         with ms_col1:
-            active_rev_df = summary_df[summary_df["إجمالي الإيرادات"] > 0].sort_values("إجمالي الإيرادات", ascending=False)
-            if not active_rev_df.empty:
+            active_comm_df = summary_df[summary_df["إجمالي العمولة المستحقة"] > 0].sort_values("إجمالي العمولة المستحقة", ascending=False)
+            if not active_comm_df.empty:
                 # إذا زاد عدد الشركات عن 6 شركات، نعرض أعلى 5 شركات ونجمع باقي الشركات في شريحة "أخرى" للحفاظ على وضوح وجمال الرسم
-                if len(active_rev_df) > 6:
-                    top_n = active_rev_df.iloc[:5]
-                    other_sum = active_rev_df.iloc[5:]["إجمالي الإيرادات"].sum()
-                    other_count = len(active_rev_df) - 5
+                if len(active_comm_df) > 6:
+                    top_n = active_comm_df.iloc[:5]
+                    other_sum = active_comm_df.iloc[5:]["إجمالي العمولة المستحقة"].sum()
+                    other_count = len(active_comm_df) - 5
                     donut_labels = [shorten_label(x, 24) for x in top_n["الشركة"].tolist()] + [f"باقي الشركات ({other_count})"]
-                    donut_values = top_n["إجمالي الإيرادات"].tolist() + [other_sum]
+                    donut_values = top_n["إجمالي العمولة المستحقة"].tolist() + [other_sum]
                     donut_colors = ["#2563eb", "#059669", "#7c3aed", "#f97316", "#0891b2", "#94a3b8"]
-                    donut_title = "الحصة السوقية (أعلى 5 شركات + أخرى)"
+                    donut_title = "نسبة العمولة (أعلى 5 شركات + أخرى)"
                 else:
-                    donut_labels = [shorten_label(x, 26) for x in active_rev_df["الشركة"].tolist()]
-                    donut_values = active_rev_df["إجمالي الإيرادات"].tolist()
+                    donut_labels = [shorten_label(x, 26) for x in active_comm_df["الشركة"].tolist()]
+                    donut_values = active_comm_df["إجمالي العمولة المستحقة"].tolist()
                     donut_colors = ["#2563eb", "#059669", "#7c3aed", "#f97316", "#dc2626"]
-                    donut_title = "الحصة السوقية للشركات من إجمالي الإيرادات"
+                    donut_title = "الحصة من إجمالي العمولة المستحقة"
 
                 plotly_donut(
                     donut_labels,
@@ -2101,26 +2107,26 @@ with tab0:
                     donut_title,
                     colors=donut_colors
                 )
-                st.caption("💡 **ماذا يعني هذا الشكل؟** يوضح النسبة المئوية لاستحواذ كل شركة من كعكة إيرادات السوق ككل. (إذا زاد عدد الشركات النشطة، يتم عرض كبار المتصدرين وتجميع الباقي تلقائياً في شريحة موحدة لضمان وضوح الرسم).")
+                st.caption("💡 **ماذا يعني هذا الشكل؟** يوضح النسبة المئوية لمساهمة كل شركة من إجمالي العمولة المستحقة للهيئة ككل. (إذا زاد عدد الشركات النشطة، يتم عرض كبار المتصدرين وتجميع الباقي تلقائياً في شريحة موحدة لضمان وضوح الرسم).")
             else:
-                st.info("لا توجد إيرادات مسجلة للشركات في الفترة المحددة")
+                st.info("لا توجد عمولة مسجلة للشركات في الفترة المحددة")
 
         with ms_col2:
-            st.markdown('<div class="section-title" style="font-size: 16px; margin-bottom: 12px;">🏆 جدول ترتيب الشركات والحصص السوقية</div>', unsafe_allow_html=True)
-            table_ms_df = summary_df.copy().sort_values("إجمالي الإيرادات", ascending=False).reset_index(drop=True)
+            st.markdown('<div class="section-title" style="font-size: 16px; margin-bottom: 12px;">🏆 جدول ترتيب الشركات حسب العمولة المستحقة</div>', unsafe_allow_html=True)
+            table_ms_df = summary_df.copy().sort_values("إجمالي العمولة المستحقة", ascending=False).reset_index(drop=True)
             table_ms_df["الترتيب"] = range(1, len(table_ms_df) + 1)
-            table_ms_df["حالة النشاط"] = table_ms_df["إجمالي الإيرادات"].apply(lambda v: "🟢 نشطة" if v > 0 else "⚪ إقرار صفري")
+            table_ms_df["حالة النشاط"] = table_ms_df["إجمالي العمولة المستحقة"].apply(lambda v: "🟢 نشطة" if v > 0 else "⚪ إقرار صفري")
 
             display_ms_df = pd.DataFrame({
                 "الترتيب": table_ms_df["الترتيب"],
                 "الشركة": table_ms_df["الشركة"],
                 "الفئة": table_ms_df["الفئة"],
-                "إجمالي الإيرادات (ج.م)": table_ms_df["إجمالي الإيرادات"].apply(lambda x: f"{x:,.2f}"),
-                "الحصة السوقية": table_ms_df["الحصة السوقية %"].apply(lambda x: f"{x:.2f}%"),
+                "العمولة المستحقة (ج.م)": table_ms_df["إجمالي العمولة المستحقة"].apply(lambda x: f"{x:,.2f}"),
+                "نسبة المساهمة": table_ms_df["نسبة العمولة %"].apply(lambda x: f"{x:.2f}%"),
                 "النشاط": table_ms_df["حالة النشاط"]
             })
             boxed_dataframe(display_ms_df)
-            st.caption("💡 **شرح الجدول:** يرتب كافة الشركات تنازلياً من الأعلى إيراداً إلى الأقل، ويتيح التمرير والبحث مهما بلغ عدد الشركات (🟢 نشطة / ⚪ إقرار صفري).")
+            st.caption("💡 **شرح الجدول:** يرتب كافة الشركات تنازلياً من الأعلى عمولة مستحقة للهيئة إلى الأقل، ويتيح التمرير والبحث مهما بلغ عدد الشركات (🟢 نشطة / ⚪ إقرار صفري).")
 
         # ---------------------------------------------
         # 2. قسم مؤشرات الكفاءة التشغيلية
