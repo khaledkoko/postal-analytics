@@ -597,7 +597,8 @@ def apply_official_financials_to_df(df):
         work[col] = pd.to_numeric(work[col], errors="coerce").fillna(0.0)
     work["إجمالي الإيرادات الخاضعة"] = work["إيراد الصادر الداخلي"] + work["إيراد البريد المجمع"] + work["إيراد الصادر الخارجي"]
     work["العمولة المستحقة 10%"] = work["إجمالي الإيرادات الخاضعة"] * 0.10
-    work["إجمالي العمولة المستحقة"] = (work["العمولة المستحقة 10%"] + work["عمولة الوارد"] - work["خصم المعاملات الوسيطة"] + work["فروق المراجعة"]).apply(egp_round_up)
+    work["العمولة قبل التقريب"] = work["العمولة المستحقة 10%"] + work["عمولة الوارد"] - work["خصم المعاملات الوسيطة"] + work["فروق المراجعة"]
+    work["إجمالي العمولة المستحقة"] = work["العمولة قبل التقريب"].apply(egp_round_up)
     work["ضريبة القيمة المضافة"] = work["إجمالي العمولة المستحقة"] * 0.14
     work["إجمالي المديونية"] = work["إجمالي العمولة المستحقة"] + work["ضريبة القيمة المضافة"]
     work["إجمالي العمولة المحسوبة"] = work["إجمالي العمولة المستحقة"]
@@ -1901,9 +1902,13 @@ with tab0:
 
     base_commission = (total_local_revenue + total_collected_revenue + total_international_revenue) * 0.10
     total_commission = (
-        filtered_reports_df["إجمالي العمولة المستحقة"].sum()
-        if not filtered_reports_df.empty and "إجمالي العمولة المستحقة" in filtered_reports_df.columns
-        else 0
+        filtered_reports_df["العمولة قبل التقريب"].sum()
+        if not filtered_reports_df.empty and "العمولة قبل التقريب" in filtered_reports_df.columns
+        else (
+            filtered_reports_df["إجمالي العمولة المستحقة"].sum()
+            if not filtered_reports_df.empty and "إجمالي العمولة المستحقة" in filtered_reports_df.columns
+            else 0
+        )
     )
     total_indebtedness_sum = (
         filtered_reports_df["إجمالي المديونية"].sum()
