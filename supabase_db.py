@@ -48,24 +48,27 @@ def safe_div(a, b):
 
 def calculate_financials(local_outbound_revenue=0.0, collected_mail_revenue=0.0,
                          international_outbound_revenue=0.0, intermediary_transactions_discount=0.0,
-                         review_differences=0.0):
+                         review_differences=0.0, inbound_commission=0.0):
     total_eligible = (
         float(local_outbound_revenue or 0.0)
         + float(collected_mail_revenue or 0.0)
         + float(international_outbound_revenue or 0.0)
     )
     comm_10 = total_eligible * 0.10
-    total_comm = math.ceil(
+    commission_before_round = (
         comm_10
+        + float(inbound_commission or 0.0)
         - float(intermediary_transactions_discount or 0.0)
         + float(review_differences or 0.0)
     )
+    total_comm = math.ceil(commission_before_round - 1e-9)
     vat = round_money(total_comm * 0.14, 2)
     debt = math.ceil(total_comm + vat)
 
     return {
         "إجمالي الإيرادات الخاضعة": round_money(total_eligible, 2),
         "العمولة المستحقة 10%": round_money(comm_10, 2),
+        "العمولة قبل التقريب": round_money(commission_before_round, 2),
         "إجمالي العمولة المستحقة": float(total_comm),
         "ضريبة القيمة المضافة": vat,
         "إجمالي المديونية": float(debt),
@@ -147,7 +150,7 @@ def get_all_quarterly_reports():
         ded_amount, review_diff = r[20], r[21]
         notes = r[22] or ""
 
-        fin = calculate_financials(local_r, bulk_r, intl_r, ded_amount, review_diff)
+        fin = calculate_financials(local_r, bulk_r, intl_r, ded_amount, review_diff, in_comm)
         ind = calculate_indicators(local_c, local_w, local_r, bulk_c, bulk_w, bulk_r, intl_c, intl_w, intl_r, in_c, in_w, in_comm)
 
         lic = str(r[3]).strip()
