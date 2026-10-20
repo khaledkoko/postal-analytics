@@ -2004,31 +2004,31 @@ with tab0:
         metric_card("الوارد", f"{total_inbound_commission:,.2f}", "orange")
 
     st.markdown('<div class="subsection-title">المؤشرات الأساسية</div>', unsafe_allow_html=True)
-    m1, m2, m3, m4, m5, m6 = st.columns(6)
+    m1, m2, m3, m4, m5 = st.columns(5)
 
     with m1:
         metric_card("عدد التقارير", f"{reports_count}", "cyan")
     with m2:
         metric_card("إجمالي العمولة المستحقة", f"{total_commission:,.2f}", "red red-pulse")
     with m3:
-        metric_card("فروق المراجعة", f"{total_review_diff:,.2f}", "gold")
+        metric_card("خصم المعاملات الوسيطة", f"{total_intermediary_discount:,.2f}", "orange")
     with m4:
-        metric_card("نسبة فروق المراجعة", f"{review_diff_percentage:,.2f}%", "orange")
-    with m5:
         metric_card("ضريبة القيمة المضافة", f"{total_vat:,.2f}", "purple")
-    with m6:
+    with m5:
         metric_card("إجمالي المديونية", f"{total_indebtedness_sum:,.2f}", "green")
 
     st.markdown('<div class="subsection-title">مؤشرات إضافية</div>', unsafe_allow_html=True)
                
-    extra1, extra2, extra3 = st.columns(3)
+    extra1, extra2, extra3, extra4 = st.columns(4)
 
     with extra1:
         metric_card("إجمالي عدد الشحنات", f"{int(total_shipments):,}", "blue")
     with extra2:
         metric_card("متوسط سعر شحنة الصادر الداخلي", f"{avg_local_shipment_price:,.2f}", "cyan")
     with extra3:
-        metric_card("خصم المعاملات الوسيطة", f"{total_intermediary_discount:,.2f}", "orange")
+        metric_card("فروق المراجعة", f"{total_review_diff:,.2f}", "gold")
+    with extra4:
+        metric_card("نسبة فروق المراجعة", f"{review_diff_percentage:,.2f}%", "orange")
 
     if not filtered_reports_df.empty:
         work_df = filtered_reports_df.copy()
