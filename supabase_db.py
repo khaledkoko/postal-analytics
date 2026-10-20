@@ -133,7 +133,8 @@ def get_all_quarterly_reports():
                r.collected_mail_count, r.collected_mail_weight, r.collected_mail_revenue,
                r.international_outbound_count, r.international_outbound_weight, r.international_outbound_revenue,
                r.inbound_count, r.inbound_weight, r.inbound_commission,
-               r.intermediary_transactions_discount, r.review_differences, r.notes
+               r.intermediary_transactions_discount, r.review_differences, r.notes,
+               r.total_commission, r.total_indebtedness
         FROM quarterly_reports r
         JOIN companies c ON r.company_id = c.id
         ORDER BY r.year DESC, r.quarter DESC, r.id ASC
@@ -149,8 +150,15 @@ def get_all_quarterly_reports():
         in_c, in_w, in_comm = r[17], r[18], r[19]
         ded_amount, review_diff = r[20], r[21]
         notes = r[22] or ""
+        stored_total_comm = r[23] if len(r) > 23 and r[23] is not None else None
+        stored_total_indebt = r[24] if len(r) > 24 and r[24] is not None else None
 
         fin = calculate_financials(local_r, bulk_r, intl_r, ded_amount, review_diff, in_comm)
+        if stored_total_comm is not None:
+            fin["إجمالي العمولة المستحقة"] = float(stored_total_comm)
+            fin["العمولة قبل التقريب"] = float(stored_total_comm)
+        if stored_total_indebt is not None:
+            fin["إجمالي المديونية"] = float(stored_total_indebt)
         ind = calculate_indicators(local_c, local_w, local_r, bulk_c, bulk_w, bulk_r, intl_c, intl_w, intl_r, in_c, in_w, in_comm)
 
         lic = str(r[3]).strip()
@@ -259,6 +267,8 @@ def migrate_smart_reports(df, target_year, target_quarter, deleted_keys=None):
         ded_s = clean_num(get_series(['خصم', 'الوسيطة']))
         diff_s = clean_num(get_series(['فروق المراجعة', 'فروق']))
         vat_s = clean_num(get_series(['القيمة المضافة', 'ضريبة']))
+        comm_s = clean_num(get_series(['إجمالي العمولة المستحقة', 'العمولة المستحقة']))
+        debt_s = clean_num(get_series(['إجمالي المديونية المستحقة', 'إجمالي المديونية']))
         notes_s = get_series(['الملاحظات', 'ملاحظات']).astype(str).replace('nan', '')
         date_s = get_series(['التاريخ', 'تاريخ']).astype(str)
 
@@ -290,6 +300,8 @@ def migrate_smart_reports(df, target_year, target_quarter, deleted_keys=None):
             ded_amt = float(ded_s.iloc[idx])
             diff_amt = float(diff_s.iloc[idx])
             vat_amt = float(vat_s.iloc[idx])
+            comm_amt = float(comm_s.iloc[idx])
+            debt_amt = float(debt_s.iloc[idx])
             note_val = str(notes_s.iloc[idx]).strip()
 
             cur.execute("""
@@ -299,14 +311,16 @@ def migrate_smart_reports(df, target_year, target_quarter, deleted_keys=None):
                     collected_mail_count, collected_mail_weight, collected_mail_revenue,
                     international_outbound_count, international_outbound_weight, international_outbound_revenue,
                     inbound_count, inbound_weight, inbound_commission,
-                    intermediary_transactions_discount, review_differences, vat_amount, notes
+                    intermediary_transactions_discount, review_differences, vat_amount, notes,
+                    total_commission, total_indebtedness
                 ) VALUES (
                     %s, %s, %s,
                     %s, 0.0, %s,
                     %s, 0.0, %s,
                     %s, 0.0, %s,
                     %s, 0.0, %s,
-                    %s, %s, %s, %s
+                    %s, %s, %s, %s,
+                    %s, %s
                 )
             """, (
                 comp_id, int(target_year), int(target_quarter),
@@ -314,7 +328,8 @@ def migrate_smart_reports(df, target_year, target_quarter, deleted_keys=None):
                 bulk_c, bulk_r,
                 intl_c, intl_r,
                 in_c, in_comm,
-                ded_amt, diff_amt, vat_amt, note_val
+                ded_amt, diff_amt, vat_amt, note_val,
+                comm_amt, debt_amt
             ))
             inserted_count += 1
 
