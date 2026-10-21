@@ -282,40 +282,43 @@ st.markdown("""
         font-weight: 800 !important;
     }
 
-    /* ===== منع الزووم العرضي على الرسوم البيانية في الموبايل مع السماح بسكرول الصفحة بسلاسة ===== */
+    /* ===== منع الزووم العرضي على الرسوم البيانية في الموبايل نهائياً مع السماح بسكرول الصفحة بسلاسة ===== */
     div[data-testid="stPlotlyChart"] {
         touch-action: pan-y !important;
         -ms-touch-action: pan-y !important;
     }
 
-    div[data-testid="stPlotlyChart"] .js-plotly-plot,
-    div[data-testid="stPlotlyChart"] .plot-container,
-    div[data-testid="stPlotlyChart"] .svg-container,
-    div[data-testid="stPlotlyChart"] svg {
-        touch-action: pan-y !important;
-        -ms-touch-action: pan-y !important;
+    /* إخفاء شريط أدوات الرسم دائماً لمنع التكبير العرضي */
+    .modebar-container, .modebar {
+        display: none !important;
     }
 
-    /* منع تفاعل السحب للتكبير على مساحة الرسم في الموبايل */
-    div[data-testid="stPlotlyChart"] .nsewdrag,
-    div[data-testid="stPlotlyChart"] .drag {
-        pointer-events: none !important;
-    }
-
-    /* Matplotlib / st.pyplot charts */
-    div[data-testid="stImage"] img,
-    div[data-testid="stPyplot"] img {
-        touch-action: pan-y !important;
-        -ms-touch-action: pan-y !important;
-        pointer-events: none !important;
-    }
-
-    @media (max-width: 768px) {
-        .modebar-container {
-            display: none !important;
-        }
-        div[data-testid="stPlotlyChart"] .js-plotly-plot .plotly .main-svg {
+    /* على شاشات اللمس والموبايل والتابلت: إيقاف تفاعل اللمس مع الرسوم تماماً لمنع الزووم وتسهيل سكرول الصفحة */
+    @media (max-width: 1024px), (pointer: coarse) {
+        div[data-testid="stPlotlyChart"],
+        div[data-testid="stPlotlyChart"] *,
+        div[data-testid="stPlotlyChart"] .js-plotly-plot,
+        div[data-testid="stPlotlyChart"] .plot-container,
+        div[data-testid="stPlotlyChart"] .svg-container,
+        div[data-testid="stPlotlyChart"] svg,
+        div[data-testid="stPlotlyChart"] .draglayer,
+        div[data-testid="stPlotlyChart"] .nsewdrag,
+        div[data-testid="stPlotlyChart"] .drag,
+        div[data-testid="stPlotlyChart"] .pie,
+        div[data-testid="stPlotlyChart"] .bar {
+            pointer-events: none !important;
             touch-action: pan-y !important;
+            -webkit-touch-callout: none !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+        }
+
+        /* Matplotlib / st.pyplot charts */
+        div[data-testid="stImage"] img,
+        div[data-testid="stPyplot"] img {
+            touch-action: pan-y !important;
+            -ms-touch-action: pan-y !important;
+            pointer-events: none !important;
         }
     }
 
