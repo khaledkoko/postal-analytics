@@ -282,6 +282,43 @@ st.markdown("""
         font-weight: 800 !important;
     }
 
+    /* ===== منع الزووم العرضي على الرسوم البيانية في الموبايل مع السماح بسكرول الصفحة بسلاسة ===== */
+    div[data-testid="stPlotlyChart"] {
+        touch-action: pan-y !important;
+        -ms-touch-action: pan-y !important;
+    }
+
+    div[data-testid="stPlotlyChart"] .js-plotly-plot,
+    div[data-testid="stPlotlyChart"] .plot-container,
+    div[data-testid="stPlotlyChart"] .svg-container,
+    div[data-testid="stPlotlyChart"] svg {
+        touch-action: pan-y !important;
+        -ms-touch-action: pan-y !important;
+    }
+
+    /* منع تفاعل السحب للتكبير على مساحة الرسم في الموبايل */
+    div[data-testid="stPlotlyChart"] .nsewdrag,
+    div[data-testid="stPlotlyChart"] .drag {
+        pointer-events: none !important;
+    }
+
+    /* Matplotlib / st.pyplot charts */
+    div[data-testid="stImage"] img,
+    div[data-testid="stPyplot"] img {
+        touch-action: pan-y !important;
+        -ms-touch-action: pan-y !important;
+        pointer-events: none !important;
+    }
+
+    @media (max-width: 768px) {
+        .modebar-container {
+            display: none !important;
+        }
+        div[data-testid="stPlotlyChart"] .js-plotly-plot .plotly .main-svg {
+            touch-action: pan-y !important;
+        }
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -1253,7 +1290,8 @@ def make_bar_chart(labels, values, title, ylabel="القيمة", rotate=20, figs
                 fontsize=10
             )
     plt.tight_layout()
-    st.pyplot(fig)
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
 
 
 def make_line_chart(x_values, series, title, ylabel="القيمة", figsize=(10, 5)):
@@ -1264,7 +1302,8 @@ def make_line_chart(x_values, series, title, ylabel="القيمة", figsize=(10,
     ax.set_title(ar_text(title), fontsize=18)
     ax.set_ylabel(ar_text(ylabel), fontsize=13)
     plt.tight_layout()
-    st.pyplot(fig)
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
 
 
 def register_arabic_font():
@@ -1455,17 +1494,23 @@ def build_official_pdf(report):
 
 
 PLOTLY_CONFIG = {
-    "displayModeBar": True,
+    "displayModeBar": False,
     "displaylogo": False,
     "scrollZoom": False,
     "responsive": True,
+    "doubleClick": False,
+    "showTips": False,
+    "showAxisDragHandles": False,
+    "showAxisRangeEntryBoxes": False,
     "modeBarButtonsToRemove": [
         "pan2d",
         "lasso2d",
         "select2d",
         "zoomIn2d",
         "zoomOut2d",
-        "autoScale2d"
+        "autoScale2d",
+        "zoom2d",
+        "resetScale2d"
     ]
 }
 
@@ -1490,7 +1535,8 @@ def plotly_donut(labels, values, title, colors=None):
         title={"text": title, "x": 0.5, "xanchor": "center"},
         height=540,
         margin=dict(t=70, b=20, l=20, r=20),
-        legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5)
+        legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
+        dragmode=False
     )
 
     st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
@@ -1516,8 +1562,11 @@ def plotly_horizontal_bar(labels, values, title, x_title="القيمة", color="
         height=560,
         margin=dict(t=70, b=20, l=20, r=20),
         xaxis_title=x_title,
-        yaxis=dict(autorange="reversed")
+        yaxis=dict(autorange="reversed"),
+        dragmode=False
     )
+    fig.update_xaxes(fixedrange=True)
+    fig.update_yaxes(fixedrange=True)
 
     st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
 
@@ -1540,8 +1589,11 @@ def plotly_vertical_bar(labels, values, title, y_title="القيمة", color="#1
         title={"text": title, "x": 0.5, "xanchor": "center"},
         height=560,
         margin=dict(t=70, b=40, l=20, r=20),
-        yaxis_title=y_title
+        yaxis_title=y_title,
+        dragmode=False
     )
+    fig.update_xaxes(fixedrange=True)
+    fig.update_yaxes(fixedrange=True)
 
     st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
 
@@ -1568,8 +1620,11 @@ def plotly_stacked_bar(x_labels, series_data, title, y_title="القيمة"):
         height=560,
         margin=dict(t=70, b=40, l=20, r=20),
         yaxis_title=y_title,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+        dragmode=False
     )
+    fig.update_xaxes(fixedrange=True)
+    fig.update_yaxes(fixedrange=True)
 
     st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
 
