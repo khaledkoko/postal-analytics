@@ -2752,6 +2752,55 @@ with tab2:
         
         # Dashboard metrics
         if not df.empty:
+            def strip_tashkeel_tab2(text):
+                import re
+                return re.sub(r'[\u064B-\u065F\u0670]', '', str(text))
+
+            # Helper to get sum safely
+            def clean_numeric(val):
+                if pd.isna(val): return 0.0
+                s = str(val).replace('٫', '.').replace('٬', '').replace(',', '').strip()
+                try:
+                    return float(s)
+                except:
+                    return 0.0
+
+            # --- حساب تصنيف حجم الشركة تلقائياً لتقارير سمارت ريبورت ---
+            comp_name_col = next((c for c in df.columns if 'اسم الشركة' in strip_tashkeel_tab2(c) or 'الشركة' in strip_tashkeel_tab2(c)), None)
+            in_rev_col = next((c for c in df.columns if 'إيراد' in strip_tashkeel_tab2(c) and ('المحلي' in strip_tashkeel_tab2(c) or 'الداخلي' in strip_tashkeel_tab2(c))), None)
+            bulk_rev_col = next((c for c in df.columns if 'إيراد' in strip_tashkeel_tab2(c) and 'المجمع' in strip_tashkeel_tab2(c)), None)
+            out_rev_col = next((c for c in df.columns if 'إيراد' in strip_tashkeel_tab2(c) and ('الدولي' in strip_tashkeel_tab2(c) or 'الخارجي' in strip_tashkeel_tab2(c))), None)
+            comm_col = next((c for c in df.columns if 'العمولة المستحقة' in strip_tashkeel_tab2(c)), None)
+
+            if comp_name_col:
+                tot_rev_s = pd.Series(0.0, index=df.index)
+                if in_rev_col: tot_rev_s += df[in_rev_col].apply(clean_numeric)
+                if bulk_rev_col: tot_rev_s += df[bulk_rev_col].apply(clean_numeric)
+                if out_rev_col: tot_rev_s += df[out_rev_col].apply(clean_numeric)
+                comm_s = df[comm_col].apply(clean_numeric) if comm_col else pd.Series(0.0, index=df.index)
+
+                temp_calc = pd.DataFrame({'c': df[comp_name_col], 'r': tot_rev_s, 'm': comm_s})
+                agg_c = temp_calc.groupby('c', as_index=False).agg({'r': 'sum', 'm': 'sum'})
+                tot_r_all = agg_c['r'].sum()
+                tot_m_all = agg_c['m'].sum()
+
+                t_map = {}
+                for _, a_r in agg_c.iterrows():
+                    cn = a_r['c']
+                    r_p = (a_r['r'] / tot_r_all * 100) if tot_r_all > 0 else 0.0
+                    m_p = (a_r['m'] / tot_m_all * 100) if tot_m_all > 0 else 0.0
+                    t_map[cn] = classify_company_size(r_p, m_p)
+
+                df['تصنيف الشركة'] = df[comp_name_col].map(t_map).fillna('⚪ غير نشطة')
+
+                # Reorder to put 'تصنيف الشركة' right after company name
+                cur_cols = list(df.columns)
+                if 'تصنيف الشركة' in cur_cols:
+                    cur_cols.remove('تصنيف الشركة')
+                    ins_pos = cur_cols.index(comp_name_col) + 1 if comp_name_col in cur_cols else 0
+                    cur_cols.insert(ins_pos, 'تصنيف الشركة')
+                    df = df[cur_cols]
+
             st.markdown("""
             <style>
             .chic-table {
@@ -2797,17 +2846,9 @@ with tab2:
             </style>
             """, unsafe_allow_html=True)
             
-            # Helper to get sum safely
-            def clean_numeric(val):
-                if pd.isna(val): return 0.0
-                s = str(val).replace('\u066b', '.').replace('\u066c', '').replace(',', '')
-                try:
-                    return float(s)
-                except:
-                    return 0.0
-
             def get_sum(col_name):
-                matched = [c for c in df.columns if col_name in c]
+                target_clean = strip_tashkeel_tab2(col_name).strip()
+                matched = [c for c in df.columns if target_clean in strip_tashkeel_tab2(c).strip()]
                 if matched:
                     return df[matched[0]].apply(clean_numeric).sum()
                 return 0
@@ -2819,8 +2860,8 @@ with tab2:
             count_intl = get_sum("عدد الصادر الدولي")
             val_intl = get_sum("إيراد الصادر الدولي")
             
-            count_bulk = get_sum("عدد البريد المجمّع")
-            val_bulk = get_sum("إيراد البريد المجمّع")
+            count_bulk = get_sum("عدد البريد المجمع")
+            val_bulk = get_sum("إيراد البريد المجمع")
             
             val_ext = get_sum("عمولة الوارد الخارجي")
             
@@ -3076,7 +3117,24 @@ with tab2:
                     else:
                         st.info("لا توجد تقارير للحذف.")
 
+            st.markdown("---")
+            st.markdown('<div class="subsection-title">🏷️ تصنيف الشركات حسب حجم النشاط في تقارير سمارت ريبورت</div>', unsafe_allow_html=True)
+            t_kpi1, t_kpi2, t_kpi3, t_kpi4 = st.columns(4)
+            n_l = int((df["تصنيف الشركة"] == "🏢 كبيرة").sum()) if "تصنيف الشركة" in df.columns else 0
+            n_m = int((df["تصنيف الشركة"] == "🏬 متوسطة").sum()) if "تصنيف الشركة" in df.columns else 0
+            n_s = int((df["تصنيف الشركة"] == "🏪 صغيرة").sum()) if "تصنيف الشركة" in df.columns else 0
+            n_in = int((df["تصنيف الشركة"] == "⚪ غير نشطة").sum()) if "تصنيف الشركة" in df.columns else 0
+            with t_kpi1:
+                metric_card("🏢 شركات كبيرة (حصة ≥ 10%)", f"{n_l} تقرير", "purple")
+            with t_kpi2:
+                metric_card("🏬 شركات متوسطة (2% - 10%)", f"{n_m} تقرير", "cyan")
+            with t_kpi3:
+                metric_card("🏪 شركات صغيرة (< 2%)", f"{n_s} تقرير", "green")
+            with t_kpi4:
+                metric_card("⚪ غير نشطة / صفري", f"{n_in} تقرير", "slate")
+
             st.markdown("### تفاصيل تقارير الموظفين")
+            st.caption("💡 **ملاحظة:** تم إضافة عمود **تصنيف الشركة** تلقائياً بجانب اسم الشركة بناءً على حصتها السوقية وحجم إيراداتها وعمولتها.")
             st.dataframe(export_df, use_container_width=True)
         else:
             st.warning("لا توجد بيانات مسجلة حتى الآن في جوجل شيت.")

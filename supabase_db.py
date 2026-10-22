@@ -206,19 +206,26 @@ def get_all_quarterly_reports():
 
     return result
 
+import re
+
+def strip_tashkeel(text):
+    return re.sub(r'[\u064B-\u065F\u0670]', '', str(text))
+
 def migrate_smart_reports(df, target_year, target_quarter, deleted_keys=None):
     if df is None or df.empty:
         return False, "لا توجد بيانات في ملف سمارت ريبورت للترحيل."
 
-    deleted_keys = deleted_keys or []
+    deleted_keys = set(deleted_keys or [])
     conn = get_db_connection()
     cur = conn.cursor()
 
     try:
         def get_series(col_names):
+            norm_col_names = [strip_tashkeel(n).strip() for n in col_names]
             for c in df.columns:
-                for n in col_names:
-                    if n in str(c):
+                c_norm = strip_tashkeel(c).strip()
+                for n in norm_col_names:
+                    if n in c_norm:
                         return df[c]
             return pd.Series(0, index=df.index)
 
@@ -262,6 +269,7 @@ def migrate_smart_reports(df, target_year, target_quarter, deleted_keys=None):
         in_rev_s = clean_num(get_series(['إيراد الصادر المحلي', 'إيراد الصادر الداخلي']))
         bulk_count_s = clean_num(get_series(['عدد البريد المجمع', 'عدد المجمع']))
         bulk_rev_s = clean_num(get_series(['إيراد البريد المجمع', 'إيراد المجمع']))
+        out_count_s = clean_num(get_series(['عدد الصادر الدولي', 'عدد الصادر الخارجي']))
         out_rev_s = clean_num(get_series(['إيراد الصادر الدولي', 'إيراد الصادر الخارجي']))
         inbound_comm_s = clean_num(get_series(['عمولة الوارد الخارجي', 'عمولة الوارد']))
         ded_s = clean_num(get_series(['خصم', 'الوسيطة']))
@@ -280,9 +288,10 @@ def migrate_smart_reports(df, target_year, target_quarter, deleted_keys=None):
             name = str(name_series.iloc[idx]).strip()
             date_val = str(date_s.iloc[idx]).strip() if not date_s.empty else ""
 
-            # Check if deleted by supervisor
-            key = f"{name}_{lic}_{date_val}"
-            if key in deleted_keys:
+            # Check if deleted by supervisor (handling both lic with and without .0)
+            k1 = f"{name}_{lic}_{date_val}"
+            k2 = f"{name}_{lic}.0_{date_val}"
+            if k1 in deleted_keys or k2 in deleted_keys:
                 continue
 
             comp_id = companies_map.get(lic)
@@ -293,7 +302,7 @@ def migrate_smart_reports(df, target_year, target_quarter, deleted_keys=None):
             local_r = float(in_rev_s.iloc[idx])
             bulk_c = int(bulk_count_s.iloc[idx])
             bulk_r = float(bulk_rev_s.iloc[idx])
-            intl_c = 0
+            intl_c = int(out_count_s.iloc[idx])
             intl_r = float(out_rev_s.iloc[idx])
             in_c = 0
             in_comm = float(inbound_comm_s.iloc[idx])
