@@ -1289,6 +1289,35 @@ def metric_card(label, value, color_class="blue"):
     )
 
 
+def classify_company_size(share_pct, comm_pct=0.0):
+    """
+    تصنيف الشركات تلقائياً إلى:
+    - 🏢 كبيرة: الحصة السوقية أو حصة العمولة >= 10%
+    - 🏬 متوسطة: الحصة من 2% إلى أقل من 10%
+    - 🏪 صغيرة: الحصة أكبر من 0% وأقل من 2%
+    - ⚪ غير نشطة: بدون إيرادات أو عمولة (0%)
+    """
+    try:
+        s_val = float(share_pct or 0.0)
+    except Exception:
+        s_val = 0.0
+    try:
+        c_val = float(comm_pct or 0.0)
+    except Exception:
+        c_val = 0.0
+
+    val = max(s_val, c_val)
+    if val >= 10.0:
+        return "🏢 كبيرة"
+    elif val >= 2.0:
+        return "🏬 متوسطة"
+    elif val > 0:
+        return "🏪 صغيرة"
+    else:
+        return "⚪ غير نشطة"
+
+
+
 def boxed_dataframe(df):
     st.markdown('<div class="table-box">', unsafe_allow_html=True)
     row_count = len(df) if df is not None else 0
@@ -1751,7 +1780,7 @@ def generate_executive_summary_excel(market_df, year_label, quarter_label, kpi_d
     ws2 = wb.create_sheet(title="الحصص السوقية والترتيب")
     ws2.views.sheetView[0].rightToLeft = True
 
-    ws2.merge_cells("A1:K1")
+    ws2.merge_cells("A1:L1")
     ws2["A1"] = f"ترتيب الشركات والحصص السوقية - السنة {year_label} الربع {quarter_label}"
     ws2["A1"].font = title_font
     ws2["A1"].alignment = Alignment(horizontal="center", vertical="center")
@@ -1759,7 +1788,7 @@ def generate_executive_summary_excel(market_df, year_label, quarter_label, kpi_d
 
     ws2.append([])
     headers2 = [
-        "الترتيب", "اسم الشركة", "فئة الترخيص",
+        "الترتيب", "اسم الشركة", "فئة الترخيص", "تصنيف الشركة",
         "إيراد الصادر الداخلي", "إيراد البريد المجمع", "إيراد الصادر الدولي",
         "إجمالي الإيرادات", "الحصة السوقية (%)", "عدد الشحنات",
         "متوسط عائد الشحنة", "صافي العمولة المستحقة"
@@ -1773,6 +1802,7 @@ def generate_executive_summary_excel(market_df, year_label, quarter_label, kpi_d
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
     total_market_rev = kpi_dict.get("total_market_rev", 0.0)
+    total_market_comm = kpi_dict.get("total_comm", 0.0)
 
     for rank, (_, row) in enumerate(market_df.iterrows(), start=1):
         r_idx = rank + 3
@@ -1787,24 +1817,26 @@ def generate_executive_summary_excel(market_df, year_label, quarter_label, kpi_d
         shipments = int(row.get("إجمالي عدد الشحنات", 0) or 0)
         avg_s = (tot_rev / shipments) if shipments > 0 else 0.0
         comm = float(row.get("إجمالي العمولة المحسوبة", row.get("إجمالي العمولة المستحقة", 0.0)) or 0.0)
+        comm_share = (comm / total_market_comm * 100) if total_market_comm > 0 else 0.0
+        tier = row.get("تصنيف الشركة", classify_company_size(share, comm_share))
 
-        vals = [rank, c_name, c_cat, loc_rev, blk_rev, intl_rev, tot_rev, share, shipments, avg_s, comm]
+        vals = [rank, c_name, c_cat, tier, loc_rev, blk_rev, intl_rev, tot_rev, share, shipments, avg_s, comm]
         for c_idx, val in enumerate(vals, start=1):
             cell = ws2.cell(row=r_idx, column=c_idx, value=val)
             cell.font = regular_font
             cell.border = thin_border
-            if c_idx in [1, 3]:
+            if c_idx in [1, 3, 4]:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             elif c_idx == 2:
                 cell.alignment = Alignment(horizontal="right", vertical="center")
             else:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
 
-            if c_idx in [4, 5, 6, 7, 10, 11]:
+            if c_idx in [5, 6, 7, 8, 11, 12]:
                 cell.number_format = '#,##0.00'
-            elif c_idx == 8:
-                cell.number_format = '0.00"%"'
             elif c_idx == 9:
+                cell.number_format = '0.00"%"'
+            elif c_idx == 10:
                 cell.number_format = '#,##0'
 
     # Auto-adjust column widths
@@ -2156,6 +2188,38 @@ with tab0:
             if r["إجمالي عدد الشحنات"] > 0 else 0.0,
             axis=1
         )
+        summary_df["تصنيف الشركة"] = summary_df.apply(
+            lambda r: classify_company_size(r.get("الحصة السوقية %", 0), r.get("نسبة العمولة %", 0)),
+            axis=1
+        )
+
+        # ---------------------------------------------
+        # تصنيف الشركات تلقائياً (كبيرة / متوسطة / صغيرة)
+        # ---------------------------------------------
+        st.markdown('<div class="subsection-title">🏷️ تصنيف الشركات تلقائياً حسب حجم النشاط والحصة السوقية</div>', unsafe_allow_html=True)
+        tier_kpi1, tier_kpi2, tier_kpi3, tier_kpi4 = st.columns(4)
+        n_large = int((summary_df["تصنيف الشركة"] == "🏢 كبيرة").sum())
+        n_medium = int((summary_df["تصنيف الشركة"] == "🏬 متوسطة").sum())
+        n_small = int((summary_df["تصنيف الشركة"] == "🏪 صغيرة").sum())
+        n_inactive = int((summary_df["تصنيف الشركة"] == "⚪ غير نشطة").sum())
+
+        with tier_kpi1:
+            metric_card("🏢 شركات كبيرة (حصة ≥ 10%)", f"{n_large} شركة", "purple")
+        with tier_kpi2:
+            metric_card("🏬 شركات متوسطة (2% - 10%)", f"{n_medium} شركة", "cyan")
+        with tier_kpi3:
+            metric_card("🏪 شركات صغيرة (< 2%)", f"{n_small} شركة", "green")
+        with tier_kpi4:
+            metric_card("⚪ غير نشطة / صفري", f"{n_inactive} شركة", "slate")
+
+        with st.expander("ℹ️ تفاصيل ومعايير التصنيف التلقائي للشركات"):
+            st.markdown("""
+            يتم تصنيف الشركات تلقائياً وفقاً للوزن النسبي في السوق (أعلى قيمة بين **الحصة السوقية للإيرادات** و **نسبة الاستحواذ على العمولة**):
+            - **🏢 شركات كبيرة (Large):** تحقق حصة سوقية أو عمولة **10% فأكثر** (تمثل ركائز السوق الأساسية).
+            - **🏬 شركات متوسطة (Medium):** تحقق حصة سوقية بين **2% وأقل من 10%** (شركات ذات نشاط ملحوظ ومستقر).
+            - **🏪 شركات صغيرة (Small):** تحقق حصة سوقية أقل من **2%** وأكبر من 0% (شركات ناشئة أو ذات حجم أعمال محدود).
+            - **⚪ غير نشطة / صفري:** إقرار صفري أو بدون مبيعات مسجلة خلال الفترة المحددة.
+            """)
 
         # ---------------------------------------------
         # 1. قسم الحصة السوقية ونسبة الاستحواذ على العمولة المستحقة
@@ -2192,7 +2256,7 @@ with tab0:
                 st.info("لا توجد عمولة مسجلة للشركات في الفترة المحددة")
 
         with ms_col2:
-            st.markdown('<div class="section-title" style="font-size: 16px; margin-bottom: 12px;">🏆 جدول ترتيب الشركات حسب العمولة المستحقة</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-title" style="font-size: 16px; margin-bottom: 12px;">🏆 جدول ترتيب الشركات حسب العمولة وحجم النشاط</div>', unsafe_allow_html=True)
             table_ms_df = summary_df.copy().sort_values("إجمالي العمولة المستحقة", ascending=False).reset_index(drop=True)
             table_ms_df["الترتيب"] = range(1, len(table_ms_df) + 1)
             table_ms_df["حالة النشاط"] = table_ms_df["إجمالي العمولة المستحقة"].apply(lambda v: "🟢 نشطة" if v > 0 else "⚪ إقرار صفري")
@@ -2200,13 +2264,47 @@ with tab0:
             display_ms_df = pd.DataFrame({
                 "الترتيب": table_ms_df["الترتيب"],
                 "الشركة": table_ms_df["الشركة"],
+                "تصنيف الحجم": table_ms_df["تصنيف الشركة"],
                 "الفئة": table_ms_df["الفئة"],
                 "العمولة المستحقة (ج.م)": table_ms_df["إجمالي العمولة المستحقة"].apply(lambda x: f"{x:,.2f}"),
+                "الحصة السوقية": table_ms_df["الحصة السوقية %"].apply(lambda x: f"{x:.2f}%"),
                 "نسبة المساهمة": table_ms_df["نسبة العمولة %"].apply(lambda x: f"{x:.2f}%"),
                 "النشاط": table_ms_df["حالة النشاط"]
             })
             boxed_dataframe(display_ms_df)
-            st.caption("💡 **شرح الجدول:** يرتب كافة الشركات تنازلياً من الأعلى عمولة مستحقة للهيئة إلى الأقل، ويتيح التمرير والبحث مهما بلغ عدد الشركات (🟢 نشطة / ⚪ إقرار صفري).")
+            st.caption("💡 **شرح الجدول:** يرتب كافة الشركات تنازلياً من الأعلى عمولة مستحقة مع بيان تصنيف حجم كل شركة تلقائياً (🏢 كبيرة / 🏬 متوسطة / 🏪 صغيرة) وحصتها السوقية.")
+
+        # رسوم بيانية لتوزيع الإيرادات والعمولة حسب تصنيف حجم الشركات
+        tier_active_df = summary_df[summary_df["إجمالي الإيرادات"] > 0]
+        if not tier_active_df.empty:
+            tier_rev_agg = tier_active_df.groupby("تصنيف الشركة", as_index=False).agg({
+                "إجمالي الإيرادات": "sum",
+                "إجمالي العمولة المستحقة": "sum"
+            })
+            tier_order = ["🏢 كبيرة", "🏬 متوسطة", "🏪 صغيرة"]
+            tier_rev_agg["sort_key"] = tier_rev_agg["تصنيف الشركة"].apply(lambda x: tier_order.index(x) if x in tier_order else 99)
+            tier_rev_agg = tier_rev_agg.sort_values("sort_key")
+
+            t_col1, t_col2 = st.columns(2)
+            with t_col1:
+                st.markdown('<div class="subsection-title">توزيع إيرادات السوق حسب حجم الشركات</div>', unsafe_allow_html=True)
+                plotly_donut(
+                    tier_rev_agg["تصنيف الشركة"].tolist(),
+                    tier_rev_agg["إجمالي الإيرادات"].tolist(),
+                    "حصة الشرائح من إجمالي الإيرادات",
+                    colors=["#7c3aed", "#0891b2", "#10b981", "#94a3b8"]
+                )
+                st.caption("💡 **ماذا يعني هذا الشكل؟** يوضح نسبة استحواذ كل شريحة حجمية (كبيرة / متوسطة / صغيرة) على إجمالي إيرادات السوق البريدي.")
+
+            with t_col2:
+                st.markdown('<div class="subsection-title">توزيع العمولة المستحقة حسب حجم الشركات</div>', unsafe_allow_html=True)
+                plotly_donut(
+                    tier_rev_agg["تصنيف الشركة"].tolist(),
+                    tier_rev_agg["إجمالي العمولة المستحقة"].tolist(),
+                    "حصة الشرائح من إجمالي العمولة المستحقة",
+                    colors=["#7c3aed", "#0891b2", "#10b981", "#94a3b8"]
+                )
+                st.caption("💡 **ماذا يعني هذا الشكل؟** يوضح مساهمة كل شريحة في إجمالي العمولات المستحقة الدفع لهيئة البريد.")
 
 
         row1_col1, row1_col2 = st.columns(2)
@@ -2388,8 +2486,16 @@ with tab0:
                 "القيمة"
             )
 
-        st.markdown('<div class="subsection-title">جدول ملخص حسب الشركة</div>', unsafe_allow_html=True)
-        boxed_dataframe(summary_df)
+        st.markdown('<div class="subsection-title">جدول ملخص شامل ومصنف حسب الشركة</div>', unsafe_allow_html=True)
+        col_order_pref = [
+            "الشركة", "الفئة", "تصنيف الشركة", "إجمالي الإيرادات", "الحصة السوقية %",
+            "إجمالي العمولة المستحقة", "نسبة العمولة %", "متوسط عائد الشحنة",
+            "إجمالي عدد الشحنات", "إيراد الصادر الداخلي", "إيراد البريد المجمع",
+            "إيراد الصادر الخارجي", "عمولة الوارد", "خصم المعاملات الوسيطة",
+            "فروق المراجعة", "ضريبة القيمة المضافة"
+        ]
+        final_summary_cols = [c for c in col_order_pref if c in summary_df.columns] + [c for c in summary_df.columns if c not in col_order_pref]
+        boxed_dataframe(summary_df[final_summary_cols])
     else:
         st.info("لا توجد تقارير كافية لعرض مؤشرات الداشبورد")
 
@@ -2419,6 +2525,35 @@ with tab1:
         reports_df = apply_official_financials_to_df(pd.DataFrame(reports_data)) if reports_data else pd.DataFrame()
         if not reports_df.empty and "رقم الرخصة" in reports_df.columns:
             reports_df["رقم الرخصة"] = reports_df["رقم الرخصة"].astype(str).str.replace(r'\.0$', '', regex=True)
+
+        # --- ربط تصنيف حجم الشركة تلقائياً من واقع التقارير المالية ---
+        if not reports_df.empty and "الشركة" in reports_df.columns:
+            rep_copy = reports_df.copy()
+            for col_r in ["إيراد الصادر الداخلي", "إيراد البريد المجمع", "إيراد الصادر الخارجي", "إجمالي العمولة المستحقة"]:
+                if col_r not in rep_copy.columns:
+                    rep_copy[col_r] = 0.0
+                rep_copy[col_r] = pd.to_numeric(rep_copy[col_r], errors="coerce").fillna(0.0)
+
+            rep_copy["_temp_tot_rev"] = (
+                rep_copy["إيراد الصادر الداخلي"] + rep_copy["إيراد البريد المجمع"] + rep_copy["إيراد الصادر الخارجي"]
+            )
+            agg_rep = rep_copy.groupby("الشركة", as_index=False).agg({
+                "_temp_tot_rev": "sum",
+                "إجمالي العمولة المستحقة": "sum"
+            })
+            tot_mkt_tab1 = agg_rep["_temp_tot_rev"].sum()
+            tot_comm_tab1 = agg_rep["إجمالي العمولة المستحقة"].sum()
+
+            tier_dict = {}
+            for _, r_row in agg_rep.iterrows():
+                c_name = r_row["الشركة"]
+                s_pct = (r_row["_temp_tot_rev"] / tot_mkt_tab1 * 100) if tot_mkt_tab1 > 0 else 0.0
+                c_pct = (r_row["إجمالي العمولة المستحقة"] / tot_comm_tab1 * 100) if tot_comm_tab1 > 0 else 0.0
+                tier_dict[c_name] = classify_company_size(s_pct, c_pct)
+
+            df["تصنيف الحجم"] = df["اسم الشركة"].map(tier_dict).fillna("⚪ غير نشطة")
+        else:
+            df["تصنيف الحجم"] = "⚪ غير نشطة"
 
         # --- فلتر تلقائي: عرض فقط الشركات التي لها تقارير فعلية ---
         companies_with_reports = set()
@@ -2470,7 +2605,7 @@ with tab1:
         st.markdown("---")
         st.markdown("### البحث والتصفية")
 
-        col1, col2, col3, col4, col5 = st.columns(5)
+        col1, col2, col3, col4, col5, col6 = st.columns(6)
 
         with col1:
             search_name = st.text_input("بحث باسم الشركة", key="search_company_name")
@@ -2479,14 +2614,18 @@ with tab1:
             search_license = st.text_input("بحث برقم الرخصة", key="search_company_license")
 
         with col3:
+            tier_options = ["الكل", "🏢 كبيرة", "🏬 متوسطة", "🏪 صغيرة", "⚪ غير نشطة"]
+            selected_tier = st.selectbox("تصفية بالحجم", tier_options, key="filter_company_tier")
+
+        with col4:
             categories = ["الكل"] + sorted(df["الفئة"].dropna().astype(str).unique().tolist())
             selected_category = st.selectbox("تصفية بالفئة", categories, key="filter_company_category")
 
-        with col4:
+        with col5:
             weight_options = ["الكل", "نعم", "لا"]
             selected_weight = st.selectbox("تصفية باستخدام الأوزان", weight_options, key="filter_company_weight")
 
-        with col5:
+        with col6:
             exclude_options = ["الكل", "مستبعدة", "غير مستبعدة"]
             selected_exclude = st.selectbox("حالة الاستبعاد", exclude_options, key="filter_company_excluded")
 
@@ -2502,6 +2641,9 @@ with tab1:
                 filtered_df["رقم الرخصة"].astype(str).str.contains(search_license.strip(), case=False, na=False)
             ]
 
+        if selected_tier != "الكل":
+            filtered_df = filtered_df[filtered_df["تصنيف الحجم"] == selected_tier]
+
         if selected_category != "الكل":
             filtered_df = filtered_df[filtered_df["الفئة"] == selected_category]
 
@@ -2514,12 +2656,20 @@ with tab1:
             filtered_df = filtered_df[filtered_df["مستبعدة من المؤشرات"] == is_ex]
 
         st.markdown("### ملخص سريع")
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
         c1.metric("عدد الشركات المعروضة", len(filtered_df))
-        c2.metric("عدد الشركات التي تستخدم الأوزان", int(filtered_df["تستخدم الأوزان"].sum()) if not filtered_df.empty else 0)
-        c3.metric("عدد الشركات التي لا تستخدم الأوزان", int((~filtered_df["تستخدم الأوزان"]).sum()) if not filtered_df.empty else 0)
+        n_l = int((filtered_df["تصنيف الحجم"] == "🏢 كبيرة").sum()) if "تصنيف الحجم" in filtered_df.columns else 0
+        n_m = int((filtered_df["تصنيف الحجم"] == "🏬 متوسطة").sum()) if "تصنيف الحجم" in filtered_df.columns else 0
+        n_s = int((filtered_df["تصنيف الحجم"] == "🏪 صغيرة").sum()) if "تصنيف الحجم" in filtered_df.columns else 0
+        c2.metric("🏢 شركات كبيرة", f"{n_l}")
+        c3.metric("🏬 شركات متوسطة", f"{n_m}")
+        c4.metric("🏪 شركات صغيرة", f"{n_s}")
 
         st.markdown("### النتائج")
+        # ترتيب الأعمدة لوضع تصنيف الحجم بجانب اسم الشركة
+        pref_cols = ["id", "اسم الشركة", "تصنيف الحجم", "الفئة", "رقم الرخصة", "تستخدم الأوزان", "مستبعدة من المؤشرات", "نشطة", "ملاحظات"]
+        show_cols = [c for c in pref_cols if c in filtered_df.columns] + [c for c in filtered_df.columns if c not in pref_cols]
+        filtered_df = filtered_df[show_cols]
         boxed_dataframe(filtered_df)
 
         output = BytesIO()
