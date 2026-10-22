@@ -249,6 +249,8 @@ def migrate_smart_reports(df, target_year, target_quarter, deleted_keys=None):
             cat = str(cat_series.iloc[idx]).strip()
             if not lic or lic == "nan" or lic == "0" or not name or name == "nan":
                 continue
+            if lic == "999" or "تجربة" in name or "فحص" in name:
+                continue
 
             # Check if company exists by license
             cur.execute("SELECT id FROM companies WHERE license_number = %s", (lic,))
@@ -292,6 +294,8 @@ def migrate_smart_reports(df, target_year, target_quarter, deleted_keys=None):
             k1 = f"{name}_{lic}_{date_val}"
             k2 = f"{name}_{lic}.0_{date_val}"
             if k1 in deleted_keys or k2 in deleted_keys:
+                continue
+            if lic == "999" or "تجربة" in name or "فحص" in name:
                 continue
 
             comp_id = companies_map.get(lic)

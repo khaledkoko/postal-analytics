@@ -2732,6 +2732,14 @@ with tab2:
         if emp_col_test:
             df = df[~df[emp_col_test[0]].astype(str).str.strip().str.lower().isin(['test_agent', 'test', 'ggggg'])]
 
+        # استبعاد شركات وتجارب الفحص الاختبارية تلقائياً
+        comp_col_test = [c for c in df.columns if "اسم الشركة" in c or "الشركة" in c]
+        if comp_col_test:
+            df = df[~df[comp_col_test[0]].astype(str).str.contains('تجربة|فحص', na=False)]
+        lic_col_test = [c for c in df.columns if "رقم الترخيص" in c or ("الترخيص" in c and "فئة" not in c)]
+        if lic_col_test:
+            df = df[~df[lic_col_test[0]].astype(str).str.strip().str.replace(r'\.0$', '', regex=True).isin(['999', '0'])]
+
         # تطبيق حذف التقارير المحددة بواسطة المشرف
         if not df.empty and len(deleted_list) > 0:
             comp_col = [c for c in df.columns if "اسم الشركة" in c]
