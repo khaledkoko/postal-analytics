@@ -72,7 +72,29 @@ if "pending_dashboard_mode" in st.session_state:
     del st.session_state.pending_dashboard_mode
 
 st.markdown("""
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <style>
+    /* ========= منع الزووم عند اللمس على الموبيل ========= */
+    html {
+        touch-action: manipulation;
+    }
+
+    /* منع الزووم على رسوم Plotly عند اللمس */
+    .js-plotly-plot,
+    .js-plotly-plot .plotly,
+    .js-plotly-plot .svg-container,
+    div[data-testid="stPlotlyChart"],
+    div[data-testid="stPlotlyChart"] > div,
+    div[data-testid="stPlotlyChart"] iframe {
+        touch-action: pan-y !important;
+    }
+
+    /* منع الزووم على كل العناصر التفاعلية */
+    button, input, select, textarea, a {
+        touch-action: manipulation;
+    }
+    /* ===================================================== */
+
     .main {
         background: #f6f8fc;
     }
