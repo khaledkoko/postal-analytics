@@ -2285,19 +2285,9 @@ with tab0:
             tier_rev_agg["sort_key"] = tier_rev_agg["تصنيف الشركة"].apply(lambda x: tier_order.index(x) if x in tier_order else 99)
             tier_rev_agg = tier_rev_agg.sort_values("sort_key")
 
-            t_col1, t_col2 = st.columns(2)
-            with t_col1:
-                st.markdown('<div class="subsection-title">توزيع إيرادات السوق حسب حجم الشركات</div>', unsafe_allow_html=True)
-                plotly_donut(
-                    tier_rev_agg["تصنيف الشركة"].tolist(),
-                    tier_rev_agg["إجمالي الإيرادات"].tolist(),
-                    "حصة الشرائح من إجمالي الإيرادات",
-                    colors=["#7c3aed", "#0891b2", "#10b981", "#94a3b8"]
-                )
-                st.caption("💡 **ماذا يعني هذا الشكل؟** يوضح نسبة استحواذ كل شريحة حجمية (كبيرة / متوسطة / صغيرة) على إجمالي إيرادات السوق البريدي.")
-
-            with t_col2:
-                st.markdown('<div class="subsection-title">توزيع العمولة المستحقة حسب حجم الشركات</div>', unsafe_allow_html=True)
+                        c_left, c_center, c_right = st.columns([1, 2, 1])
+            with c_center:
+                st.markdown('<div class="subsection-title" style="text-align: center;">توزيع العمولة المستحقة حسب حجم الشركات</div>', unsafe_allow_html=True)
                 plotly_donut(
                     tier_rev_agg["تصنيف الشركة"].tolist(),
                     tier_rev_agg["إجمالي العمولة المستحقة"].tolist(),
@@ -2305,6 +2295,7 @@ with tab0:
                     colors=["#7c3aed", "#0891b2", "#10b981", "#94a3b8"]
                 )
                 st.caption("💡 **ماذا يعني هذا الشكل؟** يوضح مساهمة كل شريحة في إجمالي العمولات المستحقة الدفع لهيئة البريد.")
+
 
 
         row1_col1, row1_col2 = st.columns(2)
