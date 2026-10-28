@@ -1607,27 +1607,49 @@ def plotly_donut(labels, values, title, colors=None):
 def plotly_horizontal_bar(labels, values, title, x_title="القيمة", color="#7c3aed"):
     fig = go.Figure()
 
+    numeric_vals = []
+    for v in values:
+        try:
+            numeric_vals.append(float(v or 0.0))
+        except Exception:
+            numeric_vals.append(0.0)
+
+    max_val = max(numeric_vals) if numeric_vals else 0.0
+    x_max = (max_val * 1.35) if max_val > 0 else 1.0
+
+    text_list = []
+    for v in numeric_vals:
+        if v == int(v):
+            text_list.append(f"{int(v):,}")
+        else:
+            text_list.append(f"{v:,.2f}")
+
     fig.add_trace(
         go.Bar(
             x=values,
             y=labels,
             orientation="h",
             marker_color=color,
-            text=[f"{v:,.2f}" for v in values],
-            textposition="outside",
+            text=text_list,
+            textposition="auto",
+            insidetextfont=dict(color="white", size=13),
+            outsidetextfont=dict(color="#0f172a", size=13),
+            cliponaxis=False,
             hovertemplate=f"<b>%{{y}}</b><br>{x_title}: %{{x:,.2f}}<extra></extra>"
         )
     )
 
     fig.update_layout(
-        title={"text": title, "x": 0.5, "xanchor": "center"},
+        title={"text": title, "x": 0.5, "xanchor": "center", "font": dict(size=18, color="#0f172a")},
         height=560,
-        margin=dict(t=70, b=20, l=20, r=20),
+        margin=dict(t=70, b=30, l=30, r=100),
         xaxis_title=x_title,
         yaxis=dict(autorange="reversed"),
-        dragmode=False
+        dragmode=False,
+        uniformtext_minsize=11,
+        uniformtext_mode="show"
     )
-    fig.update_xaxes(fixedrange=True)
+    fig.update_xaxes(range=[0, x_max], fixedrange=True)
     fig.update_yaxes(fixedrange=True)
 
     st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
@@ -1636,26 +1658,43 @@ def plotly_horizontal_bar(labels, values, title, x_title="القيمة", color="
 def plotly_vertical_bar(labels, values, title, y_title="القيمة", color="#10b981"):
     fig = go.Figure()
 
+    numeric_vals = []
+    for v in values:
+        try:
+            numeric_vals.append(float(v or 0.0))
+        except Exception:
+            numeric_vals.append(0.0)
+
+    max_val = max(numeric_vals) if numeric_vals else 0.0
+    y_max = (max_val * 1.25) if max_val > 0 else 1.0
+
+    text_list = [f"{int(v):,}" if v == int(v) else f"{v:,.2f}" for v in numeric_vals]
+
     fig.add_trace(
         go.Bar(
             x=labels,
             y=values,
             marker_color=color,
-            text=[f"{v:,.2f}" if isinstance(v, float) else f"{v:,}" for v in values],
-            textposition="outside",
+            text=text_list,
+            textposition="auto",
+            insidetextfont=dict(color="white", size=13),
+            outsidetextfont=dict(color="#0f172a", size=13),
+            cliponaxis=False,
             hovertemplate=f"<b>%{{x}}</b><br>{y_title}: %{{y:,.2f}}<extra></extra>"
         )
     )
 
     fig.update_layout(
-        title={"text": title, "x": 0.5, "xanchor": "center"},
+        title={"text": title, "x": 0.5, "xanchor": "center", "font": dict(size=18, color="#0f172a")},
         height=560,
-        margin=dict(t=70, b=40, l=20, r=20),
+        margin=dict(t=70, b=40, l=30, r=30),
         yaxis_title=y_title,
-        dragmode=False
+        dragmode=False,
+        uniformtext_minsize=11,
+        uniformtext_mode="show"
     )
     fig.update_xaxes(fixedrange=True)
-    fig.update_yaxes(fixedrange=True)
+    fig.update_yaxes(range=[0, y_max], fixedrange=True)
 
     st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
 
