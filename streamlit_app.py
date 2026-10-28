@@ -1266,6 +1266,8 @@ def shape_labels(labels):
 
 def normalize_category(value):
     value = safe_text(value, "").strip()
+    if not value or value.lower() == "nan":
+        return ""
     value = value.replace("داخلى", "داخلي")
     value = value.replace("داخلي+مجمع", "داخلي + مجمع")
     value = value.replace("داخلي +مجمع", "داخلي + مجمع")
@@ -1273,7 +1275,13 @@ def normalize_category(value):
     value = value.replace("داخلى+مجمع", "داخلي + مجمع")
     value = value.replace("داخلى + مجمع", "داخلي + مجمع")
     value = " ".join(value.split())
-    allowed = ["داخلي", "مجمع", "داخلي + مجمع", "شامل"]
+
+    # توحيد البريد الشامل والفئة الأولى
+    norm_val = value.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ة", "ه").replace("ى", "ي")
+    if "شامل" in norm_val or "اولي" in norm_val:
+        return "البريد الشامل"
+
+    allowed = ["داخلي", "مجمع", "داخلي + مجمع", "البريد الشامل"]
     return value if value in allowed else value
 
 
@@ -1470,19 +1478,19 @@ def build_official_pdf(report):
     y -= 24
 
     activity_rows = []
-    category = safe_text(report.get("الفئة", ""), "")
+    category = normalize_category(safe_text(report.get("الفئة", ""), ""))
 
-    if category in ["داخلي", "داخلي + مجمع", "شامل"]:
+    if category in ["داخلي", "داخلي + مجمع", "البريد الشامل", "شامل"]:
         activity_rows.append(
             f"الصادر الداخلي | العدد: {safe_text(report.get('عدد الصادر الداخلي'))} | الوزن: {safe_text(report.get('وزن الصادر الداخلي'))} | الإيراد/العمولة: {safe_text(report.get('إيراد الصادر الداخلي'))}"
         )
 
-    if category in ["مجمع", "داخلي + مجمع", "شامل"]:
+    if category in ["مجمع", "داخلي + مجمع", "البريد الشامل", "شامل"]:
         activity_rows.append(
             f"البريد المجمع | العدد: {safe_text(report.get('عدد البريد المجمع'))} | الوزن: {safe_text(report.get('وزن البريد المجمع'))} | الإيراد/العمولة: {safe_text(report.get('إيراد البريد المجمع'))}"
         )
 
-    if category == "شامل":
+    if category in ["البريد الشامل", "شامل"]:
         activity_rows.append(
             f"الصادر الخارجي | العدد: {safe_text(report.get('عدد الصادر الخارجي'))} | الوزن: {safe_text(report.get('وزن الصادر الخارجي'))} | الإيراد/العمولة: {safe_text(report.get('إيراد الصادر الخارجي'))}"
         )
@@ -1892,6 +1900,11 @@ with tab0:
 
     companies_df = pd.DataFrame(companies_data) if companies_data else pd.DataFrame()
     reports_df = apply_official_financials_to_df(pd.DataFrame(reports_data)) if reports_data else pd.DataFrame()
+
+    if not companies_df.empty and "الفئة" in companies_df.columns:
+        companies_df["الفئة"] = companies_df["الفئة"].astype(str).apply(normalize_category)
+    if not reports_df.empty and "الفئة" in reports_df.columns:
+        reports_df["الفئة"] = reports_df["الفئة"].astype(str).apply(normalize_category)
 
     def shorten_label(text, max_len=28):
         text = safe_text(text, "")
@@ -2312,7 +2325,7 @@ with tab0:
                     .apply(normalize_category)
                 )
 
-                category_order = ["داخلي", "مجمع", "داخلي + مجمع", "شامل"]
+                category_order = ["داخلي", "مجمع", "داخلي + مجمع", "البريد الشامل"]
                 category_counts = (
                     normalized_company_categories
                     .value_counts()
@@ -2395,6 +2408,11 @@ with tab0:
                 revenue_by_category_df["إيراد الصادر الخارجي"].fillna(0)
             )
             revenue_by_category_df["الفئة"] = revenue_by_category_df["الفئة"].astype(str).apply(normalize_category)
+            revenue_by_category_df = (
+                revenue_by_category_df.groupby("الفئة", as_index=False)["إجمالي الإيرادات"]
+                .sum()
+                .sort_values("إجمالي الإيرادات", ascending=False)
+            )
 
             plotly_horizontal_bar(
                 revenue_by_category_df["الفئة"].tolist(),
@@ -2512,8 +2530,12 @@ with tab1:
             df["رقم الرخصة"] = df["رقم الرخصة"].astype(str).str.replace(r'\.0$', '', regex=True)
         if "اسم الشركة" in df.columns:
             df = df.drop_duplicates(subset=["اسم الشركة"])
+        if "الفئة" in df.columns:
+            df["الفئة"] = df["الفئة"].astype(str).apply(normalize_category)
 
         reports_df = apply_official_financials_to_df(pd.DataFrame(reports_data)) if reports_data else pd.DataFrame()
+        if not reports_df.empty and "الفئة" in reports_df.columns:
+            reports_df["الفئة"] = reports_df["الفئة"].astype(str).apply(normalize_category)
         if not reports_df.empty and "رقم الرخصة" in reports_df.columns:
             reports_df["رقم الرخصة"] = reports_df["رقم الرخصة"].astype(str).str.replace(r'\.0$', '', regex=True)
 
@@ -2701,6 +2723,10 @@ with tab2:
                 df[col] = numeric_col
             except:
                 pass
+
+        for c in df.columns:
+            if "فئة" in c or "الفئة" in c:
+                df[c] = df[c].apply(lambda x: normalize_category(x) if pd.notna(x) else x)
 
         # Load deleted reports from Supabase (persistent across restarts)
         import json

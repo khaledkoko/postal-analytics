@@ -39,6 +39,23 @@ def round_money(val, digits=2):
     except Exception:
         return 0.0
 
+def normalize_category(value):
+    value = str(value or "").strip()
+    if not value or value.lower() == "nan":
+        return ""
+    value = value.replace("داخلى", "داخلي")
+    value = value.replace("داخلي+مجمع", "داخلي + مجمع")
+    value = value.replace("داخلي +مجمع", "داخلي + مجمع")
+    value = value.replace("داخلي+ مجمع", "داخلي + مجمع")
+    value = value.replace("داخلى+مجمع", "داخلي + مجمع")
+    value = value.replace("داخلى + مجمع", "داخلي + مجمع")
+    value = " ".join(value.split())
+    norm_val = value.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ة", "ه").replace("ى", "ي")
+    if "شامل" in norm_val or "اولي" in norm_val:
+        return "البريد الشامل"
+    allowed = ["داخلي", "مجمع", "داخلي + مجمع", "البريد الشامل"]
+    return value if value in allowed else value
+
 def safe_div(a, b):
     try:
         b_flt = float(b or 0.0)
@@ -115,8 +132,8 @@ def get_all_companies():
             "اسم الشركة": str(r[2]).strip(),
             "company_name": str(r[2]).strip(),
             "الاسم التجاري": str(r[2]).strip(),
-            "الفئة": str(r[3]).strip(),
-            "فئة الترخيص": str(r[3]).strip(),
+            "الفئة": normalize_category(r[3]),
+            "فئة الترخيص": normalize_category(r[3]),
             "تستخدم الأوزان": bool(r[4]),
             "ملاحظات": str(r[5] or ""),
             "نشطة": bool(r[6])
@@ -172,8 +189,8 @@ def get_all_quarterly_reports():
             "company_name": r[2],
             "رقم الرخصة": lic,
             "license_number": lic,
-            "الفئة": r[4],
-            "فئة الترخيص": r[4],
+            "الفئة": normalize_category(r[4]),
+            "فئة الترخيص": normalize_category(r[4]),
             "تستخدم الأوزان": bool(r[5]),
             "السنة": r[6],
             "year": r[6],
@@ -246,7 +263,7 @@ def migrate_smart_reports(df, target_year, target_quarter, deleted_keys=None):
             if lic.endswith(".0"):
                 lic = lic[:-2]
             name = str(name_series.iloc[idx]).strip()
-            cat = str(cat_series.iloc[idx]).strip()
+            cat = normalize_category(cat_series.iloc[idx])
             if not lic or lic == "nan" or lic == "0" or not name or name == "nan":
                 continue
             if lic == "999" or "تجربة" in name or "فحص" in name:
