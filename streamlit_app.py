@@ -2285,7 +2285,7 @@ with tab0:
             tier_rev_agg["sort_key"] = tier_rev_agg["تصنيف الشركة"].apply(lambda x: tier_order.index(x) if x in tier_order else 99)
             tier_rev_agg = tier_rev_agg.sort_values("sort_key")
 
-                        c_left, c_center, c_right = st.columns([1, 2, 1])
+            c_left, c_center, c_right = st.columns([1, 2, 1])
             with c_center:
                 st.markdown('<div class="subsection-title" style="text-align: center;">توزيع العمولة المستحقة حسب حجم الشركات</div>', unsafe_allow_html=True)
                 plotly_donut(
