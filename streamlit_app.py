@@ -2192,21 +2192,23 @@ with tab0:
     import plotly.graph_objects as _go
     _fig_prog = _go.Figure(data=[_go.Pie(
         values=[_done, _remaining],
-        labels=["✅ مكتمل", "⏳ متبقي"],
-        hole=0.62,
+        labels=[f"✅ مكتمل ({_done})", f"⏳ متبقي ({_remaining})"],
+        hole=0.58,
         marker=dict(
             colors=["#00c9a7", "#ff6b6b"],
             line=dict(color="#1a1a2e", width=3)
         ),
-        textinfo="none",
+        textinfo="value",
+        textposition="inside",
+        insidetextfont=dict(size=16, color="#ffffff", family="Cairo, sans-serif"),
         hovertemplate="<b>%{label}</b><br>عدد: %{value}<br>نسبة: %{percent}<extra></extra>",
         direction="clockwise",
         sort=False,
     )])
     _fig_prog.add_annotation(
-        text=f"<b>{_pct}%</b><br><span style='font-size:11px;color:#aaa'>مكتمل</span>",
+        text=f"<b style='font-size:22px;color:#00c9a7'>{_done}</b><span style='font-size:14px;color:#9ca3af'> / {_total_cos}</span><br><b style='font-size:16px;color:#00c9a7'>{_pct}%</b><br><span style='font-size:11px;color:#9ca3af'>مكتمل</span>",
         x=0.5, y=0.5,
-        font=dict(size=20, color="#00c9a7", family="Cairo, sans-serif"),
+        font=dict(family="Cairo, sans-serif"),
         showarrow=False,
         align="center"
     )
@@ -2223,7 +2225,7 @@ with tab0:
         margin=dict(t=20, b=20, l=10, r=10),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        height=260,
+        height=270,
     )
 
     _prog_col1, _prog_col2 = st.columns([1.4, 2.6])
