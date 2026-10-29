@@ -1602,27 +1602,41 @@ PLOTLY_CONFIG = {
 }
 
 
-def plotly_donut(labels, values, title, colors=None):
-    fig = go.Figure(
-        data=[
-            go.Pie(
-                labels=labels,
-                values=values,
-                hole=0.55,
-                textinfo="label+percent",
-                textposition="inside",
-                pull=[0.02] * len(labels),
-                marker=dict(colors=colors) if colors else None,
-                hovertemplate="<b>%{label}</b><br>القيمة: %{value:,.2f}<br>النسبة: %{percent}<extra></extra>"
-            )
-        ]
+def plotly_donut(labels, values, title, colors=None, text=None, texttemplate=None, hovertemplate=None, center_text=None):
+    pie_kwargs = dict(
+        labels=labels,
+        values=values,
+        hole=0.55,
+        textposition="inside",
+        insidetextfont=dict(size=14, family="Cairo, sans-serif"),
+        pull=[0.02] * len(labels),
+        marker=dict(colors=colors) if colors else None,
+        hovertemplate=hovertemplate or "<b>%{label}</b><br>القيمة: %{value:,.2f}<br>النسبة: %{percent}<extra></extra>"
     )
+    if text is not None:
+        pie_kwargs["text"] = text
+        pie_kwargs["textinfo"] = "text"
+    elif texttemplate is not None:
+        pie_kwargs["texttemplate"] = texttemplate
+    else:
+        pie_kwargs["textinfo"] = "label+percent"
+
+    fig = go.Figure(data=[go.Pie(**pie_kwargs)])
+
+    if center_text:
+        fig.add_annotation(
+            text=center_text,
+            x=0.5, y=0.5,
+            font=dict(family="Cairo, sans-serif"),
+            showarrow=False,
+            align="center"
+        )
 
     fig.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"},
         height=540,
         margin=dict(t=70, b=20, l=20, r=20),
-        legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5, font=dict(family="Cairo, sans-serif")),
         dragmode=False
     )
 
@@ -2461,13 +2475,31 @@ with tab0:
                     .reindex(category_order, fill_value=0)
                 )
 
+                cat_labels = category_counts.index.tolist()
+                cat_values = category_counts.values.tolist()
+                total_cat_cos = sum(cat_values)
+
+                # صياغة النص الداخلي لكل شريحة مع عدد الشركات والنسبة ودليل الألوان
+                cat_slice_texts = []
+                cat_legend_labels = []
+                for lbl, val in zip(cat_labels, cat_values):
+                    pct = (val / total_cat_cos * 100) if total_cat_cos > 0 else 0
+                    pct_str = f"{pct:.1f}%" if pct % 1 != 0 else f"{int(pct)}%"
+                    unit_str = "شركات" if 3 <= val <= 10 else "شركة"
+                    
+                    cat_slice_texts.append(f"<b>{lbl}</b><br>{pct_str} ({val} {unit_str})")
+                    cat_legend_labels.append(f"{lbl} ({val} {unit_str})")
+
                 plotly_donut(
-                    category_counts.index.tolist(),
-                    category_counts.values.tolist(),
+                    cat_legend_labels,
+                    cat_values,
                     "توزيع عدد الشركات المسجلة حسب الفئة (بالعدد)",
-                    colors=["#2563eb", "#f97316", "#16a34a", "#dc2626"]
+                    colors=["#2563eb", "#f97316", "#16a34a", "#dc2626"],
+                    text=cat_slice_texts,
+                    hovertemplate="<b>%{label}</b><br>عدد الشركات: %{value} شركة<br>النسبة: %{percent}<extra></extra>",
+                    center_text=f"<b style='font-size:24px;color:#1e293b'>{total_cat_cos}</b><br><span style='font-size:12px;color:#64748b'>شركة مسجلة</span>"
                 )
-                st.caption("💡 **ماذا يعني هذا الشكل؟** يوضح تراخيص الشركات الخمس المسجلة: 2 شركات ترخيص شامل (40%)، 2 داخلي (40%)، وشركة واحدة داخلي + مجمع (20%)، بغض النظر عن كونها حققت مبيعات أم لا.")
+                st.caption(f"💡 **ماذا يعني هذا الشكل؟** يوضح توزيع تراخيص الـ {total_cat_cos} شركة المسجلة حسب فئة الترخيص المعتمدة.")
 
         with row1_col2:
             st.markdown('<div class="subsection-title">توزيع العمولة على الفئات</div>', unsafe_allow_html=True)
