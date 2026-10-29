@@ -2225,13 +2225,13 @@ with tab0:
         ),
         textinfo="value",
         textposition="inside",
-        insidetextfont=dict(size=18, color="#ffffff", family="Cairo, sans-serif"),
+        insidetextfont=dict(size=19, color="#ffffff", family="Cairo, sans-serif"),
         hovertemplate="<b>%{label}</b><br>عدد: %{value}<br>نسبة: %{percent}<extra></extra>",
         direction="clockwise",
         sort=False,
     )])
     _fig_prog.add_annotation(
-        text=f"<span style='font-size:26px;font-weight:900;color:#10b981'>{_done}</span><span style='font-size:16px;color:#94a3b8;font-weight:700'> / {_total_cos}</span><br><span style='font-size:18px;font-weight:800;color:#10b981'>{_pct}%</span><br><span style='font-size:12px;color:#64748b;font-weight:600'>مكتمل</span>",
+        text=f"<span style='font-size:28px;font-weight:900;color:#10b981;letter-spacing:-0.5px;'>{_pct}%</span><br><span style='font-size:14px;font-weight:700;color:#64748b;'>مكتمل</span>",
         x=0.5, y=0.5,
         font=dict(family="Cairo, sans-serif"),
         showarrow=False,
