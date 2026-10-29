@@ -2229,46 +2229,18 @@ with tab0:
     with _prog_col1:
         st.plotly_chart(_fig_prog, use_container_width=True, config={"displayModeBar": False})
     with _prog_col2:
-        st.markdown(f"""
-        <div style="
-            background: linear-gradient(135deg, rgba(0,201,167,0.12), rgba(30,30,60,0.85));
-            border: 1.5px solid rgba(0,201,167,0.35);
-            border-radius: 16px;
-            padding: 22px 28px;
-            margin-top: 12px;
-            font-family: 'Cairo', sans-serif;
-            direction: rtl;
-        ">
-            <div style="font-size:17px; color:#aaa; margin-bottom:16px; letter-spacing:0.5px;">📋 تقدم المراجعة — الربع الحالي</div>
+        # استخدام st.metric مع تقسيم columns بدلاً من HTML
+        _c1, _c2, _c3 = st.columns(3)
+        with _c1:
+            st.metric(label="✅ تقارير مكتملة", value=str(_done))
+        with _c2:
+            st.metric(label="⏳ شركات متبقية", value=str(_remaining))
+        with _c3:
+            st.metric(label="🏢 إجمالي الشركات", value=str(_total_cos))
 
-            <div style="display:flex; justify-content:space-between; margin-bottom:18px;">
-                <div style="text-align:center;">
-                    <div style="font-size:36px; font-weight:bold; color:#00c9a7;">{_done}</div>
-                    <div style="font-size:13px; color:#aaa;">✅ تقرير مكتمل</div>
-                </div>
-                <div style="text-align:center;">
-                    <div style="font-size:36px; font-weight:bold; color:#ff6b6b;">{_remaining}</div>
-                    <div style="font-size:13px; color:#aaa;">⏳ شركة متبقية</div>
-                </div>
-                <div style="text-align:center;">
-                    <div style="font-size:36px; font-weight:bold; color:#c9a000;">{_total_cos}</div>
-                    <div style="font-size:13px; color:#aaa;">🏢 إجمالي الشركات</div>
-                </div>
-            </div>
-
-            <div style="background:#1a1a2e; border-radius:50px; height:14px; overflow:hidden; margin-bottom:8px;">
-                <div style="
-                    background: linear-gradient(90deg, #00c9a7, #00b4d8);
-                    width:{_pct}%;
-                    height:100%;
-                    border-radius:50px;
-                    transition: width 1s ease;
-                    box-shadow: 0 0 10px rgba(0,201,167,0.5);
-                "></div>
-            </div>
-            <div style="font-size:12px; color:#888; text-align:left;">{_pct}% مكتمل &nbsp;|&nbsp; {100-_pct:.1f}% متبقي</div>
-        </div>
-        """, unsafe_allow_html=True)
+        # شريط التقدم الأصلي من Streamlit
+        st.caption(f"📋 تقدم المراجعة — {_pct}% مكتمل ({_done} من {_total_cos} شركة)")
+        st.progress(int(_pct))
 
     st.markdown('<div class="subsection-title">مؤشرات إضافية</div>', unsafe_allow_html=True)
                
