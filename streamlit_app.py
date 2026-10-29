@@ -2813,6 +2813,65 @@ with tab2:
                     return key_full in deleted_list
                 
                 df = df[~df.apply(is_deleted, axis=1)]
+
+        # --- ترتيب التقارير تنازلياً حسب التاريخ (التقارير الأحدث أولاً في الأعلى) ---
+        date_cols = [c for c in df.columns if "التاريخ" in c or "تاريخ" in c]
+        if date_cols and not df.empty:
+            d_col = date_cols[0]
+            arabic_digits = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
+            
+            def parse_date_to_sortable(val):
+                if pd.isna(val) or val is None:
+                    return pd.Timestamp.min
+                if isinstance(val, (pd.Timestamp, pd.DatetimeIndex)):
+                    return pd.to_datetime(val)
+                s = str(val).strip()
+                if not s:
+                    return pd.Timestamp.min
+                s = s.translate(arabic_digits)
+                s = re.sub(r'[\u200e\u200f\u202a-\u202e\ufeff]', '', s)
+                s = s.replace('،', ',').replace('  ', ' ').strip()
+                is_pm = ('م' in s) or ('PM' in s.upper())
+                is_am = ('ص' in s) or ('AM' in s.upper())
+                clean_s = re.sub(r'[^\d/:\-,\s]', '', s).strip()
+                
+                # YYYY/MM/DD
+                m_ymd = re.search(r'(\d{4})[/-](\d{1,2})[/-](\d{1,2})(?:[,\s]+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?', clean_s)
+                if m_ymd:
+                    y, m, d, hh, mm, ss = m_ymd.groups()
+                    y, m, d = int(y), int(m), int(d)
+                    hh = int(hh) if hh is not None else 0
+                    mm = int(mm) if mm is not None else 0
+                    ss = int(ss) if ss is not None else 0
+                    if is_pm and hh < 12: hh += 12
+                    elif is_am and hh == 12: hh = 0
+                    try:
+                        return pd.Timestamp(year=y, month=m, day=d, hour=hh, minute=mm, second=ss)
+                    except:
+                        pass
+
+                # DD/MM/YYYY
+                m_dmy = re.search(r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:[,\s]+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?', clean_s)
+                if m_dmy:
+                    d, m, y, hh, mm, ss = m_dmy.groups()
+                    d, m, y = int(d), int(m), int(y)
+                    hh = int(hh) if hh is not None else 0
+                    mm = int(mm) if mm is not None else 0
+                    ss = int(ss) if ss is not None else 0
+                    if is_pm and hh < 12: hh += 12
+                    elif is_am and hh == 12: hh = 0
+                    try:
+                        return pd.Timestamp(year=y, month=m, day=d, hour=hh, minute=mm, second=ss)
+                    except:
+                        pass
+
+                try:
+                    return pd.to_datetime(clean_s, dayfirst=True)
+                except:
+                    return pd.Timestamp.min
+
+            df['_dt_sort'] = df[d_col].apply(parse_date_to_sortable)
+            df = df.sort_values(by='_dt_sort', ascending=False, na_position='last').drop(columns=['_dt_sort']).reset_index(drop=True)
         
         # Dashboard metrics
         if not df.empty:
