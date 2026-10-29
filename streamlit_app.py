@@ -2458,11 +2458,12 @@ with tab0:
 
 
         with row1_col1:
-            if not companies_df.empty and "الفئة" in companies_df.columns:
-                st.markdown('<div class="subsection-title">توزيع عدد الشركات المسجلة حسب الفئة</div>', unsafe_allow_html=True)
+            category_source_df = summary_df if (summary_df is not None and not summary_df.empty and "الفئة" in summary_df.columns) else filtered_reports_df
+            if not category_source_df.empty and "الفئة" in category_source_df.columns:
+                st.markdown('<div class="subsection-title">توزيع عدد الشركات المراجعة حسب الفئة</div>', unsafe_allow_html=True)
 
                 normalized_company_categories = (
-                    companies_df["الفئة"]
+                    category_source_df["الفئة"]
                     .dropna()
                     .astype(str)
                     .apply(normalize_category)
@@ -2493,13 +2494,13 @@ with tab0:
                 plotly_donut(
                     cat_legend_labels,
                     cat_values,
-                    "توزيع عدد الشركات المسجلة حسب الفئة (بالعدد)",
+                    f"توزيع عدد الشركات حسب الفئة ({total_cat_cos} شركة)",
                     colors=["#2563eb", "#f97316", "#16a34a", "#dc2626"],
                     text=cat_slice_texts,
                     hovertemplate="<b>%{label}</b><br>عدد الشركات: %{value} شركة<br>النسبة: %{percent}<extra></extra>",
-                    center_text=f"<b style='font-size:24px;color:#1e293b'>{total_cat_cos}</b><br><span style='font-size:12px;color:#64748b'>شركة مسجلة</span>"
+                    center_text=f"<b style='font-size:24px;color:#1e293b'>{total_cat_cos}</b><br><span style='font-size:12px;color:#64748b'>شركة مراجعة</span>"
                 )
-                st.caption(f"💡 **ماذا يعني هذا الشكل؟** يوضح توزيع تراخيص الـ {total_cat_cos} شركة المسجلة حسب فئة الترخيص المعتمدة.")
+                st.caption(f"💡 **ماذا يعني هذا الشكل؟** يوضح توزيع الـ {total_cat_cos} شركة المشمولة بالتقارير المراجعة حسب فئة الترخيص المعتمدة.")
 
         with row1_col2:
             st.markdown('<div class="subsection-title">توزيع العمولة على الفئات</div>', unsafe_allow_html=True)
