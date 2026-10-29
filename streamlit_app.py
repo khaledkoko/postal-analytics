@@ -2182,7 +2182,8 @@ with tab0:
         metric_card("إجمالي المديونية", f"{total_indebtedness_sum:,.2f}", "green")
 
     # --- مؤشر بياني لتقدم التقارير: مكتمل vs متبقي ---
-    _total_cos = companies_count if companies_count > 0 else 114
+    # إجمالي عدد الشركات المستهدفة هو 114 شركة
+    _total_cos = 114
     _done = reports_count
     _remaining = max(_total_cos - _done, 0)
     _pct = round((_done / _total_cos) * 100, 1) if _total_cos > 0 else 0
@@ -2240,7 +2241,7 @@ with tab0:
 
         # شريط التقدم الأصلي من Streamlit
         st.caption(f"📋 تقدم المراجعة — {_pct}% مكتمل ({_done} من {_total_cos} شركة)")
-        st.progress(int(_pct))
+        st.progress(min(max(float(_pct) / 100.0, 0.0), 1.0))
 
     st.markdown('<div class="subsection-title">مؤشرات إضافية</div>', unsafe_allow_html=True)
                
