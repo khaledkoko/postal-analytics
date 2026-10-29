@@ -344,6 +344,31 @@ st.markdown("""
         }
     }
 
+    /* ===== تنسيق وتصغير خط بطاقات مؤشرات التقدم ===== */
+    div[data-testid="stMetric"] {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 10px 14px;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+        text-align: center;
+    }
+    div[data-testid="stMetricValue"],
+    div[data-testid="stMetricValue"] > div {
+        font-size: 22px !important;
+        font-weight: 800 !important;
+        color: #1e293b !important;
+        line-height: 1.2 !important;
+    }
+    div[data-testid="stMetricLabel"],
+    div[data-testid="stMetricLabel"] > div,
+    div[data-testid="stMetricLabel"] p {
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        color: #64748b !important;
+        white-space: nowrap !important;
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -2193,20 +2218,20 @@ with tab0:
     _fig_prog = _go.Figure(data=[_go.Pie(
         values=[_done, _remaining],
         labels=[f"✅ مكتمل ({_done})", f"⏳ متبقي ({_remaining})"],
-        hole=0.58,
+        hole=0.52,
         marker=dict(
-            colors=["#00c9a7", "#ff6b6b"],
-            line=dict(color="#1a1a2e", width=3)
+            colors=["#10b981", "#fb7185"],
+            line=dict(color="#ffffff", width=2.5)
         ),
         textinfo="value",
         textposition="inside",
-        insidetextfont=dict(size=16, color="#ffffff", family="Cairo, sans-serif"),
+        insidetextfont=dict(size=18, color="#ffffff", family="Cairo, sans-serif"),
         hovertemplate="<b>%{label}</b><br>عدد: %{value}<br>نسبة: %{percent}<extra></extra>",
         direction="clockwise",
         sort=False,
     )])
     _fig_prog.add_annotation(
-        text=f"<b style='font-size:22px;color:#00c9a7'>{_done}</b><span style='font-size:14px;color:#9ca3af'> / {_total_cos}</span><br><b style='font-size:16px;color:#00c9a7'>{_pct}%</b><br><span style='font-size:11px;color:#9ca3af'>مكتمل</span>",
+        text=f"<span style='font-size:26px;font-weight:900;color:#10b981'>{_done}</span><span style='font-size:16px;color:#94a3b8;font-weight:700'> / {_total_cos}</span><br><span style='font-size:18px;font-weight:800;color:#10b981'>{_pct}%</span><br><span style='font-size:12px;color:#64748b;font-weight:600'>مكتمل</span>",
         x=0.5, y=0.5,
         font=dict(family="Cairo, sans-serif"),
         showarrow=False,
@@ -2217,22 +2242,23 @@ with tab0:
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=-0.25,
+            y=-0.22,
             xanchor="center",
             x=0.5,
-            font=dict(size=13, color="#e0e0e0")
+            font=dict(size=13, color="#475569", family="Cairo, sans-serif")
         ),
-        margin=dict(t=20, b=20, l=10, r=10),
+        margin=dict(t=5, b=5, l=5, r=5),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        height=270,
+        height=340,
     )
 
-    _prog_col1, _prog_col2 = st.columns([1.4, 2.6])
+    _prog_col1, _prog_col2 = st.columns([1.9, 2.1])
     with _prog_col1:
         st.plotly_chart(_fig_prog, use_container_width=True, config={"displayModeBar": False})
     with _prog_col2:
-        # استخدام st.metric مع تقسيم columns بدلاً من HTML
+        st.markdown("<div style='height: 35px;'></div>", unsafe_allow_html=True)
+        # استخدام st.metric مع تقسيم columns بتنسيق خط أصغر وأنيق
         _c1, _c2, _c3 = st.columns(3)
         with _c1:
             st.metric(label="✅ تقارير مكتملة", value=str(_done))
