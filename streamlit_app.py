@@ -2220,7 +2220,7 @@ with tab0:
         labels=[f"✅ مكتمل ({_done})", f"⏳ متبقي ({_remaining})"],
         hole=0.52,
         marker=dict(
-            colors=["#10b981", "#fb7185"],
+            colors=["#10b981", "#ef4444"],
             line=dict(color="#ffffff", width=2.5)
         ),
         textinfo="value",
