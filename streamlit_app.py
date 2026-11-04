@@ -1,4 +1,3 @@
-# v16 - updated at 1793752378.4675872
 import streamlit as st
 import requests
 import pandas as pd
@@ -1948,6 +1947,53 @@ if "scan_analysis_done" not in st.session_state:
     st.session_state["scan_analysis_done"] = False
 
 
+@st.cache_data(ttl=60)
+def get_cached_reviewer_stats():
+    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQMArVLudMJy8j440FcHbxKDaRowoGc1HHwuvyUbDrQjJct04V0XvDHRp-_KaNdOsj4CwK_ArPcZ3aK/pub?gid=1721910400&single=true&output=csv"
+    try:
+        raw_df = pd.read_csv(csv_url, dtype=str)
+        emp_cols = [c for c in raw_df.columns if "الموظف" in c or "اسم الموظف" in c]
+        diff_cols = [c for c in raw_df.columns if "فروق" in c]
+        if not emp_cols or not diff_cols:
+            return None
+        emp_c = emp_cols[0]
+        diff_c = diff_cols[0]
+        
+        # استبعاد حسابات وشركات الاختبار
+        raw_df = raw_df[~raw_df[emp_c].astype(str).str.strip().str.lower().isin(['test_agent', 'test', 'ggggg'])]
+        
+        comp_cols = [c for c in raw_df.columns if "اسم الشركة" in c or "الشركة" in c]
+        if comp_cols:
+            raw_df = raw_df[~raw_df[comp_cols[0]].astype(str).str.contains('تجربة|فحص', na=False)]
+            
+        def _clean_name(name):
+            if pd.isna(name): return "غير محدد"
+            s = re.sub(r'\s+', ' ', str(name).strip())
+            if 'khaled' in s.lower() and 'ahmed' in s.lower():
+                return 'احمد خالد'
+            return s.replace('أحمد', 'احمد').replace('إبراهيم', 'ابراهيم')
+            
+        def _clean_num(val):
+            if pd.isna(val): return 0.0
+            try:
+                return float(str(val).replace(',', '').strip())
+            except Exception:
+                return 0.0
+                
+        cleaned_names = raw_df[emp_c].apply(_clean_name)
+        cleaned_diffs = raw_df[diff_c].apply(_clean_num)
+        
+        agg_df = pd.DataFrame({
+            'اسم المراجع': cleaned_names,
+            'فرق': cleaned_diffs
+        }).groupby('اسم المراجع', as_index=False).agg(
+            التقارير=('فرق', 'count'),
+            إجمالي_الفروق=('فرق', 'sum')
+        ).sort_values(by='إجمالي_الفروق', ascending=False)
+        return agg_df
+    except Exception:
+        return None
+
 # -----------------------------
 # Tabs definition
 # -----------------------------
@@ -2585,6 +2631,20 @@ with tab0:
                 color="#2563eb"
             )
 
+            st.markdown('<div class="subsection-title">فروق المراجعة المستخرجة لكل مراجع</div>', unsafe_allow_html=True)
+            smart_stats = get_cached_reviewer_stats()
+            if smart_stats is not None and not smart_stats.empty:
+                plotly_horizontal_bar(
+                    [shorten_label(x, 35) for x in smart_stats['اسم المراجع'].tolist()],
+                    smart_stats['إجمالي_الفروق'].tolist(),
+                    "فروق المراجعة لكل مراجع",
+                    "إجمالي الفروق (جنيه)",
+                    color="#8b5cf6"
+                )
+                st.caption("💡 **الشرح:** يوضح الرسم البياني إجمالي مبالغ فروق المراجعة المالية المستخرجة بواسطة كل مراجع من واقع فحص التقارير.")
+
+
+
 
 
 
@@ -3180,26 +3240,64 @@ with tab2:
                         return s
 
                     cleaned_series = df[emp_col].apply(clean_reviewer_name)
-                    reviewer_counts = cleaned_series.value_counts().reset_index()
-                    reviewer_counts.columns = ['اسم المراجع', 'التقارير']
+                    diff_col = [c for c in df.columns if "فروق" in c]
+                    if diff_col:
+                        diff_series = df[diff_col[0]].apply(clean_numeric)
+                    else:
+                        diff_series = pd.Series(0.0, index=df.index)
+
+                    reviewer_stats = pd.DataFrame({
+                        'اسم المراجع': cleaned_series,
+                        'فرق': diff_series
+                    }).groupby('اسم المراجع', as_index=False).agg(
+                        التقارير=('فرق', 'count'),
+                        إجمالي_الفروق=('فرق', 'sum')
+                    ).sort_values(by='إجمالي_الفروق', ascending=False)
                     
                     total_reports = len(df)
+                    total_diff_val = reviewer_stats['إجمالي_الفروق'].sum()
+                    
+                    display_reviewer_df = reviewer_stats.copy()
+                    display_reviewer_df['فروق المراجعة (ج.م)'] = display_reviewer_df['إجمالي_الفروق'].apply(
+                        lambda x: f"{int(x):,}" if x == int(x) else f"{x:,.2f}"
+                    )
                     
                     st.dataframe(
-                        reviewer_counts,
+                        display_reviewer_df[['اسم المراجع', 'التقارير', 'فروق المراجعة (ج.م)']],
                         use_container_width=True,
                         hide_index=True
                     )
                     
-                    st.markdown(f'''
-                    <div style="background-color: #e8f5e9; padding: 12px; border-radius: 8px; border-right: 4px solid #2e7d32; margin-top: 10px; text-align: center;">
-                        <span style="font-size: 14px; color: #1b5e20; font-weight: bold;">إجمالي التقارير</span>
-                        <br>
-                        <span style="font-size: 24px; color: #1b5e20; font-weight: bold;">{total_reports}</span>
-                    </div>
-                    ''', unsafe_allow_html=True)
+                    c_rep, c_diff = st.columns(2)
+                    with c_rep:
+                        st.markdown(f'''
+                        <div style="background-color: #e8f5e9; padding: 8px; border-radius: 8px; border-right: 3px solid #2e7d32; text-align: center;">
+                            <span style="font-size: 11px; color: #1b5e20; font-weight: bold;">إجمالي التقارير</span>
+                            <br>
+                            <span style="font-size: 18px; color: #1b5e20; font-weight: bold;">{total_reports}</span>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                    with c_diff:
+                        st.markdown(f'''
+                        <div style="background-color: #ede9fe; padding: 8px; border-radius: 8px; border-right: 3px solid #7c3aed; text-align: center;">
+                            <span style="font-size: 11px; color: #5b21b6; font-weight: bold;">إجمالي الفروق</span>
+                            <br>
+                            <span style="font-size: 18px; color: #5b21b6; font-weight: bold;">{total_diff_val:,.0f}</span>
+                        </div>
+                        ''', unsafe_allow_html=True)
                 else:
                     st.warning("لم يتم العثور على عمود اسم الموظف")
+            
+            if emp_col and 'reviewer_stats' in locals() and not reviewer_stats.empty:
+                st.markdown('<div class="subsection-title" style="margin-top: 25px;">📊 فروق المراجعة المستخرجة لكل مراجع (جنيه مصري)</div>', unsafe_allow_html=True)
+                plotly_horizontal_bar(
+                    [shorten_label(x, 35) for x in reviewer_stats['اسم المراجع'].tolist()],
+                    reviewer_stats['إجمالي_الفروق'].tolist(),
+                    "فروق المراجعة لكل مراجع",
+                    "إجمالي الفروق (جنيه)",
+                    color="#8b5cf6"
+                )
+                st.caption("💡 **الشرح:** يوضح الرسم البياني إجمالي مبالغ فروق المراجعة المالية التي استخرجها كل مراجع من واقع فحص التقارير.")
             
             st.divider()
 
