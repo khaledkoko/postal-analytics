@@ -1966,6 +1966,34 @@ def get_cached_reviewer_stats():
         if comp_cols:
             raw_df = raw_df[~raw_df[comp_cols[0]].astype(str).str.contains('تجربة|فحص', na=False)]
             
+        lic_col_test = [c for c in raw_df.columns if "رقم الترخيص" in c or ("الترخيص" in c and "فئة" not in c)]
+        if lic_col_test:
+            raw_df = raw_df[~raw_df[lic_col_test[0]].astype(str).str.strip().str.replace(r'\.0$', '', regex=True).isin(['999', '0'])]
+
+        # جلب قائمة التقارير المحذوفة
+        deleted_list = []
+        if get_deleted_reports is not None:
+            try:
+                deleted_list = get_deleted_reports()
+            except Exception:
+                pass
+        if not deleted_list and os.path.exists('deleted_reports.json'):
+            try:
+                with open('deleted_reports.json', 'r', encoding='utf-8') as f:
+                    deleted_list = json.load(f)
+            except Exception:
+                pass
+
+        if not raw_df.empty and len(deleted_list) > 0:
+            date_cols = [c for c in raw_df.columns if "التاريخ" in c]
+            if comp_cols and lic_col_test and date_cols:
+                c_c, l_c, d_c = comp_cols[0], lic_col_test[0], date_cols[0]
+                def _is_deleted(row):
+                    key_full = f"{str(row.get(c_c, '')).strip()}_{str(row.get(l_c, '')).strip()}_{str(row.get(d_c, '')).strip()}"
+                    key_simple = f"{str(row.get(c_c, '')).strip()}_{str(row.get(l_c, '')).strip()}"
+                    return (key_full in deleted_list) or (key_simple in deleted_list)
+                raw_df = raw_df[~raw_df.apply(_is_deleted, axis=1)]
+
         def _clean_name(name):
             if pd.isna(name): return "غير محدد"
             s = re.sub(r'\s+', ' ', str(name).strip())
@@ -3240,64 +3268,26 @@ with tab2:
                         return s
 
                     cleaned_series = df[emp_col].apply(clean_reviewer_name)
-                    diff_col = [c for c in df.columns if "فروق" in c]
-                    if diff_col:
-                        diff_series = df[diff_col[0]].apply(clean_numeric)
-                    else:
-                        diff_series = pd.Series(0.0, index=df.index)
-
-                    reviewer_stats = pd.DataFrame({
-                        'اسم المراجع': cleaned_series,
-                        'فرق': diff_series
-                    }).groupby('اسم المراجع', as_index=False).agg(
-                        التقارير=('فرق', 'count'),
-                        إجمالي_الفروق=('فرق', 'sum')
-                    ).sort_values(by='إجمالي_الفروق', ascending=False)
+                    reviewer_counts = cleaned_series.value_counts().reset_index()
+                    reviewer_counts.columns = ['اسم المراجع', 'التقارير']
                     
                     total_reports = len(df)
-                    total_diff_val = reviewer_stats['إجمالي_الفروق'].sum()
-                    
-                    display_reviewer_df = reviewer_stats.copy()
-                    display_reviewer_df['فروق المراجعة (ج.م)'] = display_reviewer_df['إجمالي_الفروق'].apply(
-                        lambda x: f"{int(x):,}" if x == int(x) else f"{x:,.2f}"
-                    )
                     
                     st.dataframe(
-                        display_reviewer_df[['اسم المراجع', 'التقارير', 'فروق المراجعة (ج.م)']],
+                        reviewer_counts,
                         use_container_width=True,
                         hide_index=True
                     )
                     
-                    c_rep, c_diff = st.columns(2)
-                    with c_rep:
-                        st.markdown(f'''
-                        <div style="background-color: #e8f5e9; padding: 8px; border-radius: 8px; border-right: 3px solid #2e7d32; text-align: center;">
-                            <span style="font-size: 11px; color: #1b5e20; font-weight: bold;">إجمالي التقارير</span>
-                            <br>
-                            <span style="font-size: 18px; color: #1b5e20; font-weight: bold;">{total_reports}</span>
-                        </div>
-                        ''', unsafe_allow_html=True)
-                    with c_diff:
-                        st.markdown(f'''
-                        <div style="background-color: #ede9fe; padding: 8px; border-radius: 8px; border-right: 3px solid #7c3aed; text-align: center;">
-                            <span style="font-size: 11px; color: #5b21b6; font-weight: bold;">إجمالي الفروق</span>
-                            <br>
-                            <span style="font-size: 18px; color: #5b21b6; font-weight: bold;">{total_diff_val:,.0f}</span>
-                        </div>
-                        ''', unsafe_allow_html=True)
+                    st.markdown(f'''
+                    <div style="background-color: #e8f5e9; padding: 12px; border-radius: 8px; border-right: 4px solid #2e7d32; margin-top: 10px; text-align: center;">
+                        <span style="font-size: 14px; color: #1b5e20; font-weight: bold;">إجمالي التقارير</span>
+                        <br>
+                        <span style="font-size: 24px; color: #1b5e20; font-weight: bold;">{total_reports}</span>
+                    </div>
+                    ''', unsafe_allow_html=True)
                 else:
                     st.warning("لم يتم العثور على عمود اسم الموظف")
-            
-            if emp_col and 'reviewer_stats' in locals() and not reviewer_stats.empty:
-                st.markdown('<div class="subsection-title" style="margin-top: 25px;">📊 فروق المراجعة المستخرجة لكل مراجع (جنيه مصري)</div>', unsafe_allow_html=True)
-                plotly_horizontal_bar(
-                    [shorten_label(x, 35) for x in reviewer_stats['اسم المراجع'].tolist()],
-                    reviewer_stats['إجمالي_الفروق'].tolist(),
-                    "فروق المراجعة لكل مراجع",
-                    "إجمالي الفروق (جنيه)",
-                    color="#8b5cf6"
-                )
-                st.caption("💡 **الشرح:** يوضح الرسم البياني إجمالي مبالغ فروق المراجعة المالية التي استخرجها كل مراجع من واقع فحص التقارير.")
             
             st.divider()
 
