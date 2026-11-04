@@ -2586,22 +2586,7 @@ with tab0:
 
 
 
-            st.markdown('<div class="subsection-title">متوسط العمولة لكل شركة</div>', unsafe_allow_html=True)
 
-            avg_commission_df = (
-                summary_df.groupby("الشركة", as_index=False)["إجمالي العمولة المحسوبة"]
-                .mean()
-                .sort_values("إجمالي العمولة المحسوبة", ascending=False)
-                .head(10)
-            )
-
-            plotly_horizontal_bar(
-                [shorten_label(x, 35) for x in avg_commission_df["الشركة"].tolist()],
-                avg_commission_df["إجمالي العمولة المحسوبة"].tolist(),
-                "متوسط العمولة لكل شركة",
-                "متوسط العمولة",
-                color="#8b5cf6"
-            )
 
             st.markdown('<div class="subsection-title">أعلى 10 شركات حسب الوارد</div>', unsafe_allow_html=True)
 
