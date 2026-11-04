@@ -1959,8 +1959,8 @@ def get_cached_reviewer_stats():
         emp_c = emp_cols[0]
         diff_c = diff_cols[0]
         
-        # استبعاد حسابات وشركات الاختبار
-        raw_df = raw_df[~raw_df[emp_c].astype(str).str.strip().str.lower().isin(['test_agent', 'test', 'ggggg'])]
+        # استبعاد حسابات الاختبار وحسام
+        raw_df = raw_df[~raw_df[emp_c].astype(str).str.strip().str.lower().isin(['test_agent', 'test', 'ggggg', 'حسام'])]
         
         comp_cols = [c for c in raw_df.columns if "اسم الشركة" in c or "الشركة" in c]
         if comp_cols:
@@ -1990,21 +1990,25 @@ def get_cached_reviewer_stats():
                 c_c, l_c, d_c = comp_cols[0], lic_col_test[0], date_cols[0]
                 def _is_deleted(row):
                     key_full = f"{str(row.get(c_c, '')).strip()}_{str(row.get(l_c, '')).strip()}_{str(row.get(d_c, '')).strip()}"
-                    key_simple = f"{str(row.get(c_c, '')).strip()}_{str(row.get(l_c, '')).strip()}"
-                    return (key_full in deleted_list) or (key_simple in deleted_list)
+                    return key_full in deleted_list
                 raw_df = raw_df[~raw_df.apply(_is_deleted, axis=1)]
 
         def _clean_name(name):
             if pd.isna(name): return "غير محدد"
             s = re.sub(r'\s+', ' ', str(name).strip())
-            if 'khaled' in s.lower() and 'ahmed' in s.lower():
+            s_lower = s.lower()
+            if ('khaled' in s_lower and 'ahmed' in s_lower) or ('احمد' in s and 'خالد' in s):
                 return 'احمد خالد'
+            if 'فوزي' in s or 'فوزى' in s:
+                return 'احمد محمود فوزي'
             return s.replace('أحمد', 'احمد').replace('إبراهيم', 'ابراهيم')
             
         def _clean_num(val):
             if pd.isna(val): return 0.0
+            # تنظيف الفواصل الإنجليزية والعربية ٫ و ٬
+            s = str(val).replace('٫', '.').replace('٬', '').replace(',', '').strip()
             try:
-                return float(str(val).replace(',', '').strip())
+                return float(s)
             except Exception:
                 return 0.0
                 
@@ -2017,7 +2021,9 @@ def get_cached_reviewer_stats():
         }).groupby('اسم المراجع', as_index=False).agg(
             التقارير=('فرق', 'count'),
             إجمالي_الفروق=('فرق', 'sum')
-        ).sort_values(by='إجمالي_الفروق', ascending=False)
+        )
+        # فقط من لديهم فروق حقيقية أكبر من الصفر
+        agg_df = agg_df[agg_df['إجمالي_الفروق'] > 0].sort_values(by='إجمالي_الفروق', ascending=False)
         return agg_df
     except Exception:
         return None
@@ -2983,7 +2989,7 @@ with tab2:
         # استبعاد حسابات الاختبار تلقائياً
         emp_col_test = [c for c in df.columns if "اسم الموظف" in c or "الموظف" in c]
         if emp_col_test:
-            df = df[~df[emp_col_test[0]].astype(str).str.strip().str.lower().isin(['test_agent', 'test', 'ggggg'])]
+            df = df[~df[emp_col_test[0]].astype(str).str.strip().str.lower().isin(['test_agent', 'test', 'ggggg', 'حسام'])]
 
         # استبعاد شركات وتجارب الفحص الاختبارية تلقائياً
         comp_col_test = [c for c in df.columns if "اسم الشركة" in c or "الشركة" in c]
@@ -3262,8 +3268,10 @@ with tab2:
                         s = str(name).strip()
                         s = re.sub(r'\s+', ' ', s)
                         s_lower = s.lower()
-                        if 'khaled' in s_lower and 'ahmed' in s_lower:
+                        if ('khaled' in s_lower and 'ahmed' in s_lower) or ('احمد' in s and 'خالد' in s):
                             return 'احمد خالد'
+                        if 'فوزي' in s or 'فوزى' in s:
+                            return 'احمد محمود فوزي'
                         s = s.replace('أحمد', 'احمد').replace('إبراهيم', 'ابراهيم')
                         return s
 
